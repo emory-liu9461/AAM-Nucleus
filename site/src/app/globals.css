@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+/* Light, customer-facing theme. --brand is set per business in the site layout. */
+:root {
+  --brand: #2563eb;
+  --brand-dark: color-mix(in oklab, var(--brand) 78%, black);
+  --brand-soft: color-mix(in oklab, var(--brand) 10%, white);
+  --ink: #0f172a;
+  --muted: #475569;
+  --line: #e2e8f0;
+  --surface: #f8fafc;
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-brand: var(--brand);
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-soft: var(--brand-soft);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-surface: var(--surface);
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: #fff;
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .wrap { @apply mx-auto w-full max-w-6xl px-4 sm:px-6; }
+  .btn-primary { @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand; }
+  .btn-outline { @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-white px-5 py-3 font-semibold text-ink transition hover:border-brand hover:text-brand; }
+  .eyebrow { @apply text-sm font-semibold uppercase tracking-wider text-brand; }
+  .h2 { @apply text-3xl font-bold tracking-tight sm:text-4xl; }
+  .lead { @apply text-lg text-muted; }
+  .field { @apply flex flex-col gap-1 text-sm font-medium text-ink; }
+  .input { @apply w-full rounded-lg border border-line bg-white px-3 py-2.5 text-base text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20; }
+  .prose-site p { @apply mb-4 leading-relaxed text-muted; }
+}

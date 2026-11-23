@@ -7,6 +7,8 @@ import { z } from "zod";
 import { db, schema } from "@/db";
 import { dollarsToCents, slugify } from "@/lib/format";
 import { can, requireBusiness, requirePermission } from "@/lib/session";
+import { normalizeDomain } from "@/lib/site-defaults";
+import type { SiteContent } from "@/db/schema";
 
 // Every action checks the signed-in user's access first. requireBusiness() 404s
 // if the user isn't assigned to that business; the optional permission argument
@@ -275,4 +277,46 @@ export async function regenerateFormKey(slug: string) {
     .set({ formKey: sql`replace(gen_random_uuid()::text, '-', '')` })
     .where(eq(businesses.id, b.id));
   revalidatePath(`/b/${slug}/website`);
+}
+
+/* ---------- public website content (owner) ---------- */
+
+export async function updateSiteContent(slug: string, _: { error?: string; ok?: string } | null, form: FormData) {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  const lines = (k: string) => (str(form, k) ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
+  const rawDomain = str(form, "domain");
+  const domain = normalizeDomain(rawDomain);
+  if (rawDomain && !domain) return { error: "Domain should look like yourcompany.com" };
+  if (domain) {
+    const [taken] = await db.select({ id: businesses.id }).from(businesses).where(and(eq(businesses.domain, domain), sql`${businesses.id} <> ${b.id}`));
+    if (taken) return { error: `${domain} is already used by another business` };
+  }
+  const years = Number(str(form, "yearsInBusiness"));
+  const site: SiteContent = {
+    tagline: str(form, "tagline") ?? undefined,
+    heroHeadline: str(form, "heroHeadline") ?? undefined,
+    heroSubheadline: str(form, "heroSubheadline") ?? undefined,
+    about: str(form, "about") ?? undefined,
+    yearsInBusiness: Number.isFinite(years) && years > 0 ? Math.round(years) : undefined,
+    license: str(form, "license") ?? undefined,
+    insured: form.get("insured") === "on",
+    warranty: str(form, "warranty") ?? undefined,
+    hours: str(form, "hours") ?? undefined,
+    primaryCity: str(form, "primaryCity") ?? undefined,
+    serviceAreas: lines("serviceAreas"),
+    services: lines("services").map((l) => {
+      const [name, ...rest] = l.split("|");
+      return { name: name.trim(), summary: rest.join("|").trim() || undefined };
+    }).filter((s) => s.name),
+    reviews: lines("reviews").map((l) => {
+      const [name, city, text, rating] = l.split("|").map((p) => p.trim());
+      return { name, city: city || undefined, text: text ?? "", rating: Number(rating) || 5 };
+    }).filter((r) => r.name && r.text),
+    financing: str(form, "financing") ?? undefined,
+    social: { facebook: str(form, "facebook") ?? undefined, instagram: str(form, "instagram") ?? undefined, google: str(form, "google") ?? undefined },
+    analytics: { ga4: str(form, "ga4") ?? undefined, googleAds: str(form, "googleAds") ?? undefined, metaPixel: str(form, "metaPixel") ?? undefined },
+  };
+  await db.update(businesses).set({ domain, site }).where(eq(businesses.id, b.id));
+  revalidatePath(`/b/${slug}/website`, "layout");
+  return { ok: "Saved. The live website updates within about a minute." };
 }

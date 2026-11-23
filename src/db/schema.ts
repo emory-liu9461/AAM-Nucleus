@@ -114,6 +114,9 @@ export const businesses = pgTable("businesses", {
   formServices: text("form_services"), // one per line; shown as a dropdown
   formThankYou: text("form_thank_you"),
   allowedDomains: text("allowed_domains"), // comma/space separated; empty = any
+  // Public website (site/ app). domain is the bare hostname, e.g. "roofingco.com".
+  domain: text("domain").unique(),
+  site: jsonb("site").$type<SiteContent>(),
 });
 
 export const userBusinesses = pgTable(
@@ -261,8 +264,28 @@ export const scheduleEvents = pgTable(
   (t) => [index("events_business_idx").on(t.businessId), index("events_start_idx").on(t.startsAt)],
 );
 
+/** Editable content for a business's public website. Empty fields fall back to trade defaults. */
+export type SiteContent = {
+  tagline?: string;
+  heroHeadline?: string;
+  heroSubheadline?: string;
+  about?: string;
+  yearsInBusiness?: number;
+  license?: string;
+  insured?: boolean;
+  warranty?: string;
+  hours?: string;
+  primaryCity?: string;
+  serviceAreas?: string[];
+  services?: { name: string; summary?: string }[];
+  reviews?: { name: string; city?: string; text: string; rating?: number }[];
+  financing?: string;
+  social?: { facebook?: string; instagram?: string; google?: string };
+  analytics?: { ga4?: string; googleAds?: string; metaPixel?: string };
+};
+
 export type Attribution = {
-  channel?: "embed" | "hosted" | "api";
+  channel?: "embed" | "hosted" | "api" | "site";
   utmSource?: string;
   utmMedium?: string;
   utmCampaign?: string;

@@ -85,6 +85,7 @@ export function hostAllowed(business: Business, origin: string | null) {
     .map((d) => d.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "").replace(/^www\./, ""))
     .filter(Boolean);
   if (!list.length || !origin) return true; // no allowlist, or a server-to-server call (Zapier etc.)
+  if (business.domain) list.push(business.domain); // the business's own website is always allowed
   let host: string;
   try {
     host = new URL(origin).hostname.toLowerCase().replace(/^www\./, "");

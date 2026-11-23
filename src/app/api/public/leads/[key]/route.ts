@@ -50,7 +50,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ key
     return NextResponse.json({ ok: false, error: "Couldn't read the request body" }, { status: 400, headers: cors(req, true) });
   }
 
-  const result = await createWebsiteLead(business, normalize(raw), { ip: clientIp(req.headers), channel: "api" });
+  const channel = raw._channel === "site" ? "site" : "api"; // "site" = the Nucleus website template
+  const result = await createWebsiteLead(business, normalize(raw), { ip: clientIp(req.headers), channel });
 
   const redirectTo = typeof raw._redirect === "string" ? raw._redirect : null;
   if (isHtmlForm && redirectTo && /^https?:\/\//.test(redirectTo) && hostAllowed(business, redirectTo)) {

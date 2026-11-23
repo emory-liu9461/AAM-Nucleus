@@ -30,6 +30,10 @@ Protection: an optional allowed-domains list, a hidden honeypot field, 5 submiss
 
 Set `APP_URL` (e.g. `https://app.yourcompany.com`) so the snippets show your own domain rather than whichever address you opened the app from.
 
+## Public websites (`site/`)
+
+A separate app in `site/` is the **website template** for every business: one deployment serves each business on its own domain, with content edited in Nucleus (business → Website → Edit website content). See [`site/README.md`](site/README.md).
+
 ## Users and roles
 
 | Role | Can see and do |

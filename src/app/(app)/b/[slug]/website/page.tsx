@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { headers } from "next/headers";
 import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -50,6 +51,18 @@ export default async function WebsitePage({ params }: { params: Promise<{ slug: 
           {b.formEnabled ? "Accepting requests" : "Paused"}
         </span>
       </div>
+
+      <section className="card flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="card-title mb-1">Your website</div>
+          <p className="text-sm text-muted">
+            {b.domain ? <>Live at <a className="text-accent hover:underline" href={`https://${b.domain}`} target="_blank" rel="noreferrer">{b.domain}</a>, built from the Nucleus website template.</> : "Use the Nucleus website template: fill in your content and connect a domain."}
+          </p>
+        </div>
+        <Link href={`/b/${b.slug}/website/content`} className="btn">Edit website content</Link>
+      </section>
+
+      <p className="text-sm text-muted">Already have a different website? Connect it to Nucleus with any of these:</p>
 
       <section className="card space-y-3">
         <div>
