@@ -6,6 +6,8 @@ import { setLeadStage } from "@/app/actions";
 import { Badge } from "@/components/Badge";
 import { fmtDate, fmtDateTime, label, money } from "@/lib/format";
 import { can, requireBusinessPage } from "@/lib/session";
+import { transcript } from "@/lib/assistant";
+import { Transcript } from "@/components/Transcript";
 
 const { leads, contacts, users, jobs } = schema;
 
@@ -35,6 +37,7 @@ export default async function LeadDetail({ params }: { params: Promise<{ slug: s
   const { lead, contact: c, addedBy } = row;
   const [job] = await db.select({ id: jobs.id, name: jobs.name, status: jobs.status }).from(jobs).where(eq(jobs.leadId, lead.id));
   const others = await db.select({ id: leads.id, title: leads.title, stage: leads.stage, createdAt: leads.createdAt }).from(leads).where(and(eq(leads.contactId, c.id), eq(leads.businessId, b.id)));
+  const [chat] = await db.select().from(schema.chatConversations).where(and(eq(schema.chatConversations.leadId, lead.id), eq(schema.chatConversations.businessId, b.id)));
   const a = lead.attribution;
   const intake = INTAKE_LABELS.filter(([k]) => lead.intake?.[k]);
   const phoneDigits = c.phone?.replace(/[^\d+]/g, "");
@@ -110,6 +113,13 @@ export default async function LeadDetail({ params }: { params: Promise<{ slug: s
           </dl>
         </section>
       </div>
+
+      {chat && (
+        <section className="card">
+          <div className="card-title">Website chat with the AI assistant</div>
+          <Transcript lines={transcript(chat.messages)} />
+        </section>
+      )}
 
       {others.length > 1 && (
         <section className="card">

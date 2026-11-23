@@ -102,6 +102,8 @@ export function publicSite(b: Business) {
       email: b.email,
       domain: b.domain,
       formKey: b.formEnabled ? b.formKey : null,
+      // Show the AI chat on the website only when it's switched on and an API key is set.
+      assistant: Boolean(b.assistant?.enabled && b.formEnabled && process.env.ANTHROPIC_API_KEY),
     },
     content: {
       tagline: c.tagline || `${b.trade}${primaryCity ? ` in ${primaryCity}` : ""}`,

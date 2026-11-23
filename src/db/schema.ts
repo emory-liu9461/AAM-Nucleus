@@ -67,7 +67,10 @@ export const eventType = pgEnum("event_type", [
   "job_work",
   "follow_up",
   "other",
+  "call",
 ]);
+
+export const chatStatus = pgEnum("chat_status", ["open", "booked", "handoff", "closed"]);
 
 export const userRole = pgEnum("user_role", ["owner", "manager", "staff"]);
 
@@ -117,6 +120,8 @@ export const businesses = pgTable("businesses", {
   // Public website (site/ app). domain is the bare hostname, e.g. "roofingco.com".
   domain: text("domain").unique(),
   site: jsonb("site").$type<SiteContent>(),
+  // AI website assistant: on/off, booking hours and owner-written facts.
+  assistant: jsonb("assistant").$type<AssistantSettings>(),
 });
 
 export const userBusinesses = pgTable(
@@ -299,7 +304,7 @@ export type Intake = {
 };
 
 export type Attribution = {
-  channel?: "embed" | "hosted" | "api" | "site";
+  channel?: "embed" | "hosted" | "api" | "site" | "chat";
   utmSource?: string;
   utmMedium?: string;
   utmCampaign?: string;
@@ -314,6 +319,43 @@ export type Attribution = {
 };
 export type User = typeof users.$inferSelect;
 export type Role = (typeof userRole.enumValues)[number];
+/** Website chat conversations with the AI assistant. messages is the exact API history (append-only). */
+export const chatConversations = pgTable(
+  "chat_conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    token: text("token").notNull(), // secret the visitor's browser holds to continue the chat
+    status: chatStatus("status").notNull().default("open"),
+    messages: jsonb("messages").$type<unknown[]>().notNull().default([]),
+    userTurns: integer("user_turns").notNull().default(0),
+    contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+    leadId: uuid("lead_id").references(() => leads.id, { onDelete: "set null" }),
+    eventId: uuid("event_id").references(() => scheduleEvents.id, { onDelete: "set null" }),
+    attribution: jsonb("attribution").$type<Attribution>(),
+    summary: text("summary"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("chat_business_idx").on(t.businessId, t.updatedAt)],
+);
+
+export type AssistantSettings = {
+  enabled?: boolean;
+  timezone?: string; // IANA, e.g. "America/Chicago"
+  days?: number[]; // 0 = Sunday … 6 = Saturday
+  start?: string; // "09:00"
+  end?: string; // "17:00"
+  slotMinutes?: number;
+  bufferMinutes?: number;
+  minNoticeHours?: number;
+  daysAhead?: number;
+  offerCalls?: boolean;
+  instructions?: string; // facts and rules from the owner
+};
+
 export type Business = typeof businesses.$inferSelect;
 export type Contact = typeof contacts.$inferSelect;
 export type Lead = typeof leads.$inferSelect;
@@ -321,3 +363,4 @@ export type Job = typeof jobs.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type ScheduleEvent = typeof scheduleEvents.$inferSelect;
+export type ChatConversation = typeof chatConversations.$inferSelect;

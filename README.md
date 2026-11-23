@@ -34,6 +34,19 @@ Set `APP_URL` (e.g. `https://app.yourcompany.com`) so the snippets show your own
 
 A separate app in `site/` is the **website template** for every business: one deployment serves each business on its own domain, with content edited in Nucleus (business → Website → Edit website content). See [`site/README.md`](site/README.md).
 
+## AI website assistant
+
+A chat on each business's website (business → **Website** → **AI assistant**). It:
+- answers questions using that business's website content plus notes the owner adds
+- offers real open times from the Nucleus **Schedule**, inside the booking hours. Defaults are Mon–Fri 9am–5pm, 30-minute visits, at least 12 hours' notice, up to 14 days ahead. It never offers or books a time that's already taken; bookings are serialized per business with a database lock.
+- books **site visits** (or optional phone calls) and saves the customer as a lead, with the ad/UTM source and the chat transcript
+- hands off to the team (saved as a lead marked "Needs follow-up") when the customer asks for a person, has an emergency, or asks something it can't answer
+- doesn't quote prices or make up facts
+
+How it's built: Claude (`claude-opus-5-5`, low effort, with server-side refusal fallbacks) on the Messages API with three strict tools (`get_available_times`, `book_appointment`, `handoff_to_team`), run in `src/lib/assistant.ts`. Each chat turn is one short serverless request (`POST /api/public/chat/{formKey}`). The full API conversation is stored append-only in `chat_conversations`, and the stable part of the system prompt is prompt-cached. Limits: 1,000 characters per message, 40 messages per chat, 10 new chats per visitor per hour.
+
+Requires `ANTHROPIC_API_KEY` in the Nucleus project's environment variables.
+
 ## Users and roles
 
 | Role | Can see and do |

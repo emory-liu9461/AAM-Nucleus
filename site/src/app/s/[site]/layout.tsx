@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Analytics, TrackAttribution } from "@/components/Tracking";
 import { Footer, MobileBar } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { getSite, schemaType, siteUrl } from "@/lib/site";
+import { ChatWidget } from "@/components/ChatWidget";
+import { getSite, nucleusUrl, schemaType, siteUrl } from "@/lib/site";
 
 type Props = { params: Promise<{ site: string }> };
 
@@ -41,6 +42,9 @@ export default async function SiteLayout({ children, params }: Props & { childre
       <main className="flex-1">{children}</main>
       <Footer site={s} />
       <MobileBar site={s} />
+      {s.business.assistant && s.business.formKey && (
+        <ChatWidget endpoint={`${nucleusUrl()}/api/public/chat/${s.business.formKey}`} businessName={s.business.name} phone={s.business.phone} />
+      )}
       <TrackAttribution />
       <Analytics {...s.content.analytics} />
     </div>

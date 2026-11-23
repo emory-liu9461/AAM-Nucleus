@@ -69,6 +69,7 @@ export default async function WebsitePage({ params }: { params: Promise<{ slug: 
             <span className="btn-ghost cursor-not-allowed opacity-60" title="Set a domain on Edit website content, or SITE_PREVIEW_URL in Vercel">Open website ↗</span>
           )}
           <Link href={`/b/${b.slug}/website/content`} className="btn-ghost">Edit website content</Link>
+          <Link href={`/b/${b.slug}/website/assistant`} className="btn-ghost">AI assistant{b.assistant?.enabled ? " (on)" : ""}</Link>
         </div>
       </section>
 

@@ -8,7 +8,8 @@ import { db, schema } from "@/db";
 import { dollarsToCents, slugify } from "@/lib/format";
 import { can, requireBusiness, requirePermission } from "@/lib/session";
 import { normalizeDomain } from "@/lib/site-defaults";
-import type { SiteContent } from "@/db/schema";
+import type { AssistantSettings, SiteContent } from "@/db/schema";
+import { isValidTimezone } from "@/lib/availability";
 
 // Every action checks the signed-in user's access first. requireBusiness() 404s
 // if the user isn't assigned to that business; the optional permission argument
@@ -319,4 +320,38 @@ export async function updateSiteContent(slug: string, _: { error?: string; ok?: 
   await db.update(businesses).set({ domain, site }).where(eq(businesses.id, b.id));
   revalidatePath(`/b/${slug}/website`, "layout");
   return { ok: "Saved. The live website updates within about a minute." };
+}
+
+/* ---------- AI website assistant (owner) ---------- */
+
+export async function updateAssistantSettings(slug: string, _: { error?: string; ok?: string } | null, form: FormData) {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  const time = (k: string, d: string) => (/^\d{2}:\d{2}$/.test(str(form, k) ?? "") ? (str(form, k) as string) : d);
+  const num = (k: string, d: number, min: number, max: number) => {
+    const n = Number(str(form, k));
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : d;
+  };
+  const start = time("start", "09:00");
+  const end = time("end", "17:00");
+  if (end <= start) return { error: "End time must be after start time" };
+  const days = form.getAll("days").map(Number).filter((d) => d >= 0 && d <= 6);
+  if (!days.length) return { error: "Pick at least one day for appointments" };
+  const timezone = str(form, "timezone") ?? "America/Chicago";
+  if (!isValidTimezone(timezone)) return { error: "Unknown time zone" };
+  const assistant: AssistantSettings = {
+    enabled: form.get("enabled") === "on",
+    timezone,
+    days,
+    start,
+    end,
+    slotMinutes: num("slotMinutes", 30, 15, 240),
+    bufferMinutes: num("bufferMinutes", 0, 0, 120),
+    minNoticeHours: num("minNoticeHours", 12, 0, 168),
+    daysAhead: num("daysAhead", 14, 1, 60),
+    offerCalls: form.get("offerCalls") === "on",
+    instructions: (str(form, "instructions") ?? "").slice(0, 4000) || undefined,
+  };
+  await db.update(businesses).set({ assistant }).where(eq(businesses.id, b.id));
+  revalidatePath(`/b/${slug}/website`, "layout");
+  return { ok: assistant.enabled ? "Saved. The assistant is on." : "Saved. The assistant is off." };
 }

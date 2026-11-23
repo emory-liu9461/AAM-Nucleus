@@ -19,6 +19,7 @@ export type Site = {
     email: string | null;
     domain: string | null;
     formKey: string | null;
+    assistant?: boolean;
   };
   content: {
     tagline: string;
