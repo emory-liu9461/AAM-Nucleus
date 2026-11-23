@@ -4,7 +4,11 @@ export function BusinessForm({ action, business, submit }: { action: (f: FormDat
   return (
     <form action={action} className="card grid max-w-2xl gap-3 sm:grid-cols-2">
       <label className="field sm:col-span-2">Business name<input className="input" name="name" required defaultValue={business?.name} /></label>
-      <label className="field">Trade<input className="input" name="trade" required defaultValue={business?.trade ?? ""} placeholder="Roofing, Remodeling, Concrete…" /></label>
+      <label className="field">Trade
+        <input className="input" name="trade" list="trades" required defaultValue={business?.trade ?? ""} placeholder="Roofing, Remodeling, Painting…" />
+        <datalist id="trades">{["Roofing", "Remodeling", "Painting", "Concrete", "General Contracting"].map((t) => <option key={t} value={t} />)}</datalist>
+        <span className="font-normal">Sets the starting content for this business&apos;s website.</span>
+      </label>
       <label className="field">Brand color<input className="input h-9 p-1" type="color" name="color" defaultValue={business?.color ?? "#16a34a"} /></label>
       <label className="field">Phone<input className="input" name="phone" defaultValue={business?.phone ?? ""} /></label>
       <label className="field">Email<input className="input" name="email" type="email" defaultValue={business?.email ?? ""} /></label>

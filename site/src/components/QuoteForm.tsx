@@ -63,7 +63,9 @@ export function QuoteForm({
       <div className="sm:col-span-2">
         {state.error && <p className="mb-2 text-sm font-medium text-red-700" role="alert">{state.error}</p>}
         <button className="btn-primary w-full text-base" disabled={state.pending}>{state.pending ? "Sending…" : "Get my free quote"}</button>
-        <p className="mt-2 text-center text-xs text-muted">No obligation. We usually reply within one business day.</p>
+        <p className="mt-2 text-center text-xs text-muted">
+          No obligation. We usually reply within one business day.{compact && <> Bigger project? <a href="/quote" className="font-semibold text-brand hover:underline">Use the detailed form</a>.</>}
+        </p>
       </div>
     </form>
   );

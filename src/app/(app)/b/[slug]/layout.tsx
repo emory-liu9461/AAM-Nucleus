@@ -1,3 +1,5 @@
+import { and, eq, sql } from "drizzle-orm";
+import { db, schema } from "@/db";
 import { NavLink } from "@/components/NavLink";
 import { can, requireBusiness, type Permission } from "@/lib/session";
 
@@ -16,6 +18,11 @@ export default async function BusinessLayout({ children, params }: { children: R
   const { slug } = await params;
   const { business: b, user } = await requireBusiness(slug);
   const base = `/b/${b.slug}`;
+  const [{ n }] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(schema.leads)
+    .where(and(eq(schema.leads.businessId, b.id), eq(schema.leads.stage, "new")));
+  const newLeads = Number(n);
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2 text-sm text-muted">
@@ -28,6 +35,9 @@ export default async function BusinessLayout({ children, params }: { children: R
         {TABS.filter(([, , perm]) => !perm || can(user, perm)).map(([path, name]) => (
           <NavLink key={name} href={base + path} exact={path === ""} className="shrink-0">
             {name}
+            {name === "Leads" && newLeads > 0 && (
+              <span className="rounded-full bg-accent px-1.5 text-[11px] font-semibold leading-5 text-white" title={`${newLeads} new`}>{newLeads}</span>
+            )}
           </NavLink>
         ))}
       </nav>

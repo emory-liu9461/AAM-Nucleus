@@ -16,6 +16,9 @@ export default async function WebsitePage({ params }: { params: Promise<{ slug: 
   const h = await headers();
   const appUrl = process.env.APP_URL?.replace(/\/$/, "") || `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
   const formUrl = `${appUrl}/f/${b.formKey}`;
+  // The live domain if one is connected, otherwise the website project's preview address.
+  const previewBase = process.env.SITE_PREVIEW_URL?.replace(/\/$/, "");
+  const siteLink = b.domain ? `https://${b.domain}` : previewBase ? `${previewBase}/?site=${b.slug}` : null;
   const apiUrl = `${appUrl}/api/public/leads/${b.formKey}`;
   const embed = `<script src="${appUrl}/embed.js" data-key="${b.formKey}" async></script>`;
   const htmlForm = `<form action="${apiUrl}" method="POST">
@@ -56,10 +59,17 @@ export default async function WebsitePage({ params }: { params: Promise<{ slug: 
         <div>
           <div className="card-title mb-1">Your website</div>
           <p className="text-sm text-muted">
-            {b.domain ? <>Live at <a className="text-accent hover:underline" href={`https://${b.domain}`} target="_blank" rel="noreferrer">{b.domain}</a>, built from the Nucleus website template.</> : "Use the Nucleus website template: fill in your content and connect a domain."}
+            {b.domain ? <>Live at <a className="text-accent hover:underline" href={`https://${b.domain}`} target="_blank" rel="noreferrer">{b.domain}</a>, built from the Nucleus website template.</> : siteLink ? "Preview address (no domain connected yet). Connect a domain on Edit website content." : "Use the Nucleus website template: fill in your content and connect a domain."}
           </p>
         </div>
-        <Link href={`/b/${b.slug}/website/content`} className="btn">Edit website content</Link>
+        <div className="flex flex-wrap gap-2">
+          {siteLink ? (
+            <a href={siteLink} target="_blank" rel="noreferrer" className="btn">Open website ↗</a>
+          ) : (
+            <span className="btn-ghost cursor-not-allowed opacity-60" title="Set a domain on Edit website content, or SITE_PREVIEW_URL in Vercel">Open website ↗</span>
+          )}
+          <Link href={`/b/${b.slug}/website/content`} className="btn-ghost">Edit website content</Link>
+        </div>
       </section>
 
       <p className="text-sm text-muted">Already have a different website? Connect it to Nucleus with any of these:</p>

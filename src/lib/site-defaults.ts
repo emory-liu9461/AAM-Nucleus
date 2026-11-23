@@ -35,6 +35,19 @@ const PRESETS: Record<string, Preset> = {
       { name: "Flooring", summary: "Hardwood, tile, LVP and more, installed with care." },
     ],
   },
+  painting: {
+    hero: "Fresh paint, flawless finish",
+    sub: "Interior and exterior painting with careful prep, clean lines and a spotless cleanup.",
+    warranty: "Workmanship warranty on every paint job",
+    services: [
+      { name: "Interior Painting", summary: "Walls, ceilings, trim and doors, with furniture and floors fully protected." },
+      { name: "Exterior Painting", summary: "Siding, trim and doors, with thorough prep so the finish lasts for years." },
+      { name: "Cabinet Painting", summary: "A smooth, durable factory-style finish that makes kitchens look new for a fraction of replacement cost." },
+      { name: "Deck & Fence Staining", summary: "Cleaning, repairs and stain that protect wood from sun and weather." },
+      { name: "Drywall Repair", summary: "Holes, cracks and water damage patched and textured to match before painting." },
+      { name: "Commercial Painting", summary: "Offices, retail and rentals, scheduled around your business hours." },
+    ],
+  },
   concrete: {
     hero: "Concrete work built to last",
     sub: "Driveways, patios, foundations and flatwork, done on schedule.",
@@ -64,6 +77,7 @@ function presetFor(trade: string): Preset {
   const t = trade.toLowerCase();
   if (t.includes("roof")) return PRESETS.roofing;
   if (t.includes("remodel") || t.includes("renovat") || t.includes("kitchen") || t.includes("bath")) return PRESETS.remodeling;
+  if (t.includes("paint") || t.includes("stain") || t.includes("coating")) return PRESETS.painting;
   if (t.includes("concrete") || t.includes("paving") || t.includes("masonry")) return PRESETS.concrete;
   return PRESETS.general;
 }

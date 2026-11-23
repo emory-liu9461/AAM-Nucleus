@@ -173,6 +173,8 @@ export const leads = pgTable(
     closedAt: timestamp("closed_at", { withTimezone: true }),
     // Where a website lead came from: utm tags, landing page, referrer, form name.
     attribution: jsonb("attribution").$type<Attribution>(),
+    // Answers from the website intake form (timeline, budget, property, contact preferences…).
+    intake: jsonb("intake").$type<Intake>(),
     createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
   },
   (t) => [index("leads_business_idx").on(t.businessId)],
@@ -282,6 +284,18 @@ export type SiteContent = {
   financing?: string;
   social?: { facebook?: string; instagram?: string; google?: string };
   analytics?: { ga4?: string; googleAds?: string; metaPixel?: string };
+};
+
+export type Intake = {
+  timeline?: string;
+  budgetRange?: string;
+  propertyType?: string;
+  homeowner?: string;
+  contactMethod?: string;
+  bestTime?: string;
+  preferredDate?: string;
+  heardAbout?: string;
+  zip?: string;
 };
 
 export type Attribution = {

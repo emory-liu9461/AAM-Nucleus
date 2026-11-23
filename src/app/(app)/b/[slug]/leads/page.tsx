@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { createLead, setLeadStage } from "@/app/actions";
@@ -81,7 +82,7 @@ export default async function LeadsPage({ params, searchParams }: { params: Prom
             {rows.length === 0 && <tr><td colSpan={7} className="py-8 text-center text-muted">No leads here.</td></tr>}
             {rows.map(({ lead, first, last, phone, addedBy }) => (
               <tr key={lead.id}>
-                <td><div className="font-medium">{first} {last}</div><div className="text-xs text-muted">{phone}</div></td>
+                <td><Link href={`/b/${b.slug}/leads/${lead.id}`} className="font-medium hover:text-accent hover:underline">{first} {last}</Link><div className="text-xs text-muted">{phone}</div></td>
                 <td>
                   {lead.title}
                   {lead.notes && <div className="max-w-xs truncate text-xs text-muted" title={lead.notes}>{lead.notes}</div>}

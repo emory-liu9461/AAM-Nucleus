@@ -29,7 +29,11 @@ export function middleware(req: NextRequest) {
   const rewritten = url.clone();
   rewritten.pathname = `/s/${encodeURIComponent(key)}${url.pathname === "/" ? "" : url.pathname}`;
   const res = NextResponse.rewrite(rewritten);
-  if (setCookie) res.cookies.set("preview_site", setCookie, { path: "/", sameSite: "lax" });
+  if (setCookie) {
+    // Partitioned + SameSite=None lets the choice stick inside the Nucleus preview frame too.
+    const secure = url.protocol === "https:" || host === "localhost";
+    res.cookies.set("preview_site", setCookie, secure ? { path: "/", sameSite: "none", secure: true, partitioned: true } : { path: "/", sameSite: "lax" });
+  }
   return res;
 }
 

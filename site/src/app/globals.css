@@ -3,13 +3,17 @@
 /* Light, customer-facing theme. --brand is set per business in the site layout. */
 :root {
   --brand: #2563eb;
-  --brand-dark: color-mix(in oklab, var(--brand) 78%, black);
-  --brand-soft: color-mix(in oklab, var(--brand) 10%, white);
   --ink: #0f172a;
   --muted: #475569;
   --line: #e2e8f0;
   --surface: #f8fafc;
   color-scheme: light;
+}
+
+/* Shades are derived on the same element that sets --brand, so they follow each business's color. */
+:root, .site-theme {
+  --brand-dark: color-mix(in oklab, var(--brand) 78%, black);
+  --brand-soft: color-mix(in oklab, var(--brand) 10%, white);
 }
 
 @theme inline {

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
-import type { Attribution, Business } from "@/db/schema";
+import type { Attribution, Business, Intake } from "@/db/schema";
 
 /*
  * Website lead intake, shared by the hosted/embedded form (/f/[key]) and the
@@ -51,6 +51,16 @@ export function normalize(raw: Record<string, unknown>) {
     message: get("message", "details", "description", "comments", "notes", "your_message", "your-message"),
     budget: get("budget", "estimated_value", "value"),
     honeypot: get("company_website", "_gotcha", "hp"),
+    intake: {
+      timeline: get("timeline", "when", "start_date").slice(0, 100) || undefined,
+      budgetRange: get("budget_range", "budgetrange").slice(0, 100) || undefined,
+      propertyType: get("property_type", "propertytype").slice(0, 100) || undefined,
+      homeowner: get("homeowner", "owner", "own_home").slice(0, 50) || undefined,
+      contactMethod: get("contact_method", "preferred_contact").slice(0, 50) || undefined,
+      bestTime: get("best_time", "best_time_to_call").slice(0, 100) || undefined,
+      preferredDate: get("preferred_date", "visit_date").slice(0, 50) || undefined,
+      heardAbout: get("heard_about", "how_did_you_hear", "referral_source").slice(0, 100) || undefined,
+    } satisfies Intake,
     attribution: {
       utmSource: get("utm_source") || undefined,
       utmMedium: get("utm_medium") || undefined,
@@ -66,7 +76,7 @@ export function normalize(raw: Record<string, unknown>) {
   };
 }
 
-export type Intake = ReturnType<typeof normalize>;
+export type IntakeData = ReturnType<typeof normalize>;
 
 /** Pick a lead source from ad/UTM tags and the referring site. */
 export function sourceFrom(a: Attribution): Source {
@@ -101,7 +111,7 @@ export type IntakeResult = { ok: true; leadId: string | null } | { ok: false; st
 
 export async function createWebsiteLead(
   business: Business,
-  data: Intake,
+  data: IntakeData,
   meta: { ip: string; channel: Attribution["channel"] },
 ): Promise<IntakeResult> {
   // Bots fill the hidden field; pretend it worked so they don't retry.
@@ -120,7 +130,10 @@ export async function createWebsiteLead(
     return { ok: false, status: 429, error: "Too many requests. Please call us or try again later." };
 
   const attribution: Attribution = { ...stripEmpty(data.attribution), channel: meta.channel, ipHash };
-  const source = sourceFrom(attribution);
+  // Ad/UTM tags win; otherwise use the customer's answer to "How did you hear about us?"
+  let source = sourceFrom(attribution);
+  if (source === "website" && data.intake.heardAbout) source = sourceFromAnswer(data.intake.heardAbout) ?? source;
+  const intake: Intake = stripEmpty({ ...data.intake, zip: data.zip || undefined });
 
   // Reuse an existing contact with the same email or phone instead of duplicating.
   const digits = data.phone.replace(/\D/g, "");
@@ -155,7 +168,7 @@ export async function createWebsiteLead(
         .returning()
     )[0];
 
-  const budget = Number(data.budget.replace(/[^0-9.]/g, ""));
+  const budget = data.budget ? Number(data.budget.replace(/[^0-9.]/g, "")) : budgetFromRange(data.intake.budgetRange);
   const notes = data.message || null;
   const [lead] = await db
     .insert(leads)
@@ -167,9 +180,31 @@ export async function createWebsiteLead(
       estimatedValue: Number.isFinite(budget) && budget > 0 ? Math.round(budget * 100) : 0,
       notes,
       attribution,
+      intake: Object.keys(intake).length ? intake : null,
     })
     .returning({ id: leads.id });
   return { ok: true, leadId: lead.id };
+}
+
+/** "How did you hear about us?" answer -> lead source. */
+export function sourceFromAnswer(answer: string): Source | null {
+  const a = answer.toLowerCase();
+  if (/google|search/.test(a)) return "google";
+  if (/facebook|instagram|social/.test(a)) return "facebook";
+  if (/angi|homeadvisor|thumbtack|yelp/.test(a)) return "angi";
+  if (/friend|neighbor|neighbour|family|referr|word of mouth/.test(a)) return "referral";
+  if (/repeat|past customer|worked with you|before/.test(a)) return "repeat";
+  if (/sign|truck|yard|drove|saw/.test(a)) return "walk_in";
+  return null;
+}
+
+/** "$15,000–$30,000" -> midpoint in dollars (used as the lead's starting estimate). */
+export function budgetFromRange(range?: string): number {
+  if (!range) return 0;
+  const nums = (range.replace(/,/g, "").match(/\d+(\.\d+)?\s*k?/gi) ?? []).map((n) => parseFloat(n) * (/k/i.test(n) ? 1000 : 1));
+  if (!nums.length) return 0;
+  if (nums.length === 1) return /under|less|below|</i.test(range) ? nums[0] / 2 : /\+|over|more|above/i.test(range) ? nums[0] * 1.25 : nums[0];
+  return (nums[0] + nums[1]) / 2;
 }
 
 function stripEmpty<T extends object>(o: T): T {

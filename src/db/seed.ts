@@ -199,6 +199,29 @@ async function main() {
     console.log(`Seeded ${b.name} (${leadCount} leads)`);
   }
 
+  // Demo painting business with a ready-to-view sample website (no fake reviews).
+  const [painting] = await db
+    .insert(schema.businesses)
+    .values({
+      name: "Sample Painting Co.",
+      slug: "sample-painting",
+      trade: "Painting",
+      color: "#0f766e",
+      phone: "(555) 010-0300",
+      email: "office@sample-painting.example",
+      site: {
+        primaryCity: "Springfield, IL",
+        serviceAreas: ["Springfield, IL", "Chatham, IL", "Sherman, IL"],
+        yearsInBusiness: 8,
+        insured: true,
+        hours: "Mon–Sat 7am–6pm",
+        financing: "Ask about spreading larger projects over easy monthly payments.",
+      },
+    })
+    .returning();
+  created.push(painting.id);
+  console.log("Seeded Sample Painting Co. (website sample, no leads)");
+
   // Demo logins (local only; all use the password "demo-password").
   const pw = await hashPassword("demo-password");
   const [, manager, staff] = await db

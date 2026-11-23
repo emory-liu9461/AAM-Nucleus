@@ -44,6 +44,13 @@ export function Hero({ site }: { site: Site }) {
   );
 }
 
+/** Pick an icon that suits the service. */
+export function serviceIcon(name: string, trade: string) {
+  if (/paint|stain|cabinet|coat|finish/i.test(name) || /paint/i.test(trade)) return /repair|drywall/i.test(name) ? "wrench" : "brush";
+  if (/repair|fix|drywall/i.test(name)) return "wrench";
+  return "home";
+}
+
 export function PageHero({ eyebrow, title, intro }: { eyebrow?: string; title: string; intro?: string }) {
   return (
     <section className="border-b border-line bg-brand-soft">
@@ -77,7 +84,7 @@ export function ServicesGrid({ site, limit }: { site: Site; limit?: number }) {
     <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
       {list.map((s) => (
         <Link key={s.slug} href={`/services/${s.slug}`} className="group rounded-xl border border-line bg-white p-6 transition hover:-translate-y-0.5 hover:border-brand hover:shadow-lg hover:shadow-slate-900/5">
-          <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand-soft text-brand"><Icon name={/repair|fix/i.test(s.name) ? "wrench" : "home"} className="h-6 w-6" /></span>
+          <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand-soft text-brand"><Icon name={serviceIcon(s.name, site.business.trade)} className="h-6 w-6" /></span>
           <h3 className="mt-4 text-lg font-bold">{s.name}</h3>
           {s.summary && <p className="mt-2 text-sm text-muted">{s.summary}</p>}
           <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-brand">Learn more <Icon name="arrow" className="h-4 w-4 transition group-hover:translate-x-0.5" /></span>

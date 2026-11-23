@@ -25,6 +25,21 @@ export default async function SiteContentPage({ params }: { params: Promise<{ sl
         </div>
       </div>
 
+      {previewBase ? (
+        <section className="card p-0">
+          <div className="flex items-center justify-between px-4 pt-3 text-sm">
+            <span className="card-title mb-0">Live preview</span>
+            <span className="text-xs text-muted">Click around: it&apos;s the real website. Saved changes appear within about a minute.</span>
+          </div>
+          <iframe src={`${previewBase}/?site=${b.slug}`} title="Website preview" className="mt-3 h-[640px] w-full rounded-b-xl border-t border-line bg-white" />
+        </section>
+      ) : (
+        <p className="card text-sm text-muted">
+          To preview the website here, deploy the website project and add <code>SITE_PREVIEW_URL</code> (its vercel.app address) to this
+          Nucleus project&apos;s environment variables.
+        </p>
+      )}
+
       <ActionForm action={updateSiteContent.bind(null, b.slug)} submit="Save website content" className="space-y-5">
         <Card title="Domain">
           <label className="field sm:col-span-2">Website domain

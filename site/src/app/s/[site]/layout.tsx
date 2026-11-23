@@ -35,7 +35,7 @@ export default async function SiteLayout({ children, params }: Props & { childre
     sameAs: Object.values(s.content.social).filter(Boolean),
   };
   return (
-    <div style={{ ["--brand" as string]: s.business.color }} className="flex min-h-screen flex-col">
+    <div style={{ ["--brand" as string]: s.business.color }} className="site-theme flex min-h-screen flex-col">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld).replace(/</g, "\\u003c") }} />
       <Header site={s} />
       <main className="flex-1">{children}</main>

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Icon } from "@/components/Icon";
-import { QuoteForm } from "@/components/QuoteForm";
+import { IntakeForm } from "@/components/IntakeForm";
 import { PageHero, endpointFor } from "@/components/Sections";
 import { getSite, telHref } from "@/lib/site";
 
@@ -19,11 +19,11 @@ export default async function Quote({ params, searchParams }: Props) {
   const svc = s.content.services.find((x) => x.slug === sp.service)?.name;
   return (
     <>
-      <PageHero eyebrow="Free quote" title="Tell us about your project" intro="We'll get back to you within one business day, usually sooner." />
+      <PageHero eyebrow="Free quote" title="Tell us about your project" intro="Three quick steps. We'll get back to you within one business day, usually sooner." />
       <section className="py-14">
         <div className="wrap grid gap-10 lg:grid-cols-[1fr_340px]">
           <div className="rounded-2xl border border-line bg-white p-6 shadow-xl shadow-slate-900/5 sm:p-8">
-            <QuoteForm endpoint={endpointFor(s)} services={s.content.services.map((x) => x.name)} defaultService={svc} />
+            <IntakeForm endpoint={endpointFor(s)} services={s.content.services.map((x) => x.name)} defaultService={svc} />
           </div>
           <aside className="space-y-4">
             {b.phone && (
