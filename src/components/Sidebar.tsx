@@ -4,14 +4,15 @@ import { logout } from "@/app/auth-actions";
 import { can } from "@/lib/session";
 import { label } from "@/lib/format";
 import { NavLink } from "./NavLink";
+import { Logo } from "./Logo";
 
 export function Sidebar({ businesses, user }: { businesses: Business[]; user: User }) {
   const financials = can(user, "view_financials");
   const linkFor = (b: Business) => (financials ? `/b/${b.slug}` : `/b/${b.slug}/leads`);
   return (
     <aside className="flex w-full shrink-0 flex-col gap-4 border-b border-line bg-panel p-3 md:sticky md:top-0 md:h-screen md:w-60 md:border-r md:border-b-0">
-      <Link href={financials ? "/" : businesses[0] ? linkFor(businesses[0]) : "/account"} className="px-2 text-lg font-bold tracking-tight">
-        Nucleus
+      <Link href={financials ? "/" : businesses[0] ? linkFor(businesses[0]) : "/account"} className="px-2" aria-label="Nucleus home">
+        <Logo className="h-9" />
       </Link>
       {financials && businesses.length > 1 && (
         <nav className="flex flex-col gap-0.5">
