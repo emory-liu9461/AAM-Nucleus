@@ -1,7 +1,11 @@
 import { createBusiness } from "@/app/actions";
 import { BusinessForm } from "@/components/BusinessForm";
+import { redirect } from "next/navigation";
+import { can, homeFor, requireSession } from "@/lib/session";
 
-export default function NewBusinessPage() {
+export default async function NewBusinessPage() {
+  const session = await requireSession();
+  if (!can(session.user, "manage_business")) redirect(homeFor(session));
   return (
     <div className="space-y-4">
       <div>

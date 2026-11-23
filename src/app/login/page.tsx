@@ -1,26 +1,25 @@
-"use client";
+import { redirect } from "next/navigation";
+import { sql } from "drizzle-orm";
+import { db, schema } from "@/db";
+import { getSession, homeFor } from "@/lib/session";
+import { LoginForm, SetupForm } from "./forms";
 
-import { useActionState } from "react";
-import { login } from "../actions";
+export const dynamic = "force-dynamic";
 
-export default function LoginPage() {
-  const [state, action, pending] = useActionState(login, null);
+export default async function LoginPage() {
+  const session = await getSession();
+  if (session) redirect(homeFor(session));
+  const [{ c }] = await db.select({ c: sql<number>`count(*)` }).from(schema.users);
+  const needsSetup = Number(c) === 0;
   return (
     <main className="flex min-h-screen items-center justify-center p-4">
-      <form action={action} className="card w-full max-w-sm space-y-4 p-6">
+      <div className="card w-full max-w-sm space-y-4 p-6">
         <div>
           <h1 className="text-xl font-semibold">Nucleus</h1>
-          <p className="text-sm text-muted">Sign in to your dashboard</p>
+          <p className="text-sm text-muted">{needsSetup ? "Create the owner account" : "Sign in to your dashboard"}</p>
         </div>
-        <label className="field">
-          Password
-          <input className="input" type="password" name="password" autoFocus required />
-        </label>
-        {state?.error && <p className="text-sm text-bad">{state.error}</p>}
-        <button className="btn w-full" disabled={pending}>
-          {pending ? "Signing in…" : "Sign in"}
-        </button>
-      </form>
+        {needsSetup ? <SetupForm /> : <LoginForm />}
+      </div>
     </main>
   );
 }

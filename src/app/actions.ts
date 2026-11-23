@@ -1,13 +1,16 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db";
-import { SESSION_COOKIE, expectedToken, safeEqual } from "@/lib/auth";
 import { dollarsToCents, slugify } from "@/lib/format";
+import { can, requireBusiness, requirePermission } from "@/lib/session";
+
+// Every action checks the signed-in user's access first. requireBusiness() 404s
+// if the user isn't assigned to that business; the optional permission argument
+// enforces the role rules in src/lib/session.ts.
 
 const { businesses, contacts, leads, jobs, invoices, payments, scheduleEvents } = schema;
 
@@ -21,36 +24,7 @@ const req = (f: FormData, k: string) => {
   return v;
 };
 
-async function bizBySlug(slug: string) {
-  const [b] = await db.select().from(businesses).where(eq(businesses.slug, slug));
-  if (!b) throw new Error("Business not found");
-  return b;
-}
-
-/* ---------- auth ---------- */
-
-export async function login(_: unknown, form: FormData) {
-  const password = String(form.get("password") ?? "").trim();
-  const expected = (process.env.OWNER_PASSWORD ?? "").trim();
-  if (!expected || !process.env.AUTH_SECRET)
-    return { error: "Server not configured: OWNER_PASSWORD and AUTH_SECRET must be set in the hosting environment variables, then redeploy." };
-  if (!safeEqual(password, expected)) return { error: "Incorrect password" };
-  (await cookies()).set(SESSION_COOKIE, await expectedToken(), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
-  redirect("/");
-}
-
-export async function logout() {
-  (await cookies()).delete(SESSION_COOKIE);
-  redirect("/login");
-}
-
-/* ---------- businesses ---------- */
+/* ---------- businesses (owner only) ---------- */
 
 const bizSchema = z.object({
   name: z.string().min(2),
@@ -61,15 +35,19 @@ const bizSchema = z.object({
   website: z.string().nullable(),
 });
 
-export async function createBusiness(form: FormData) {
-  const data = bizSchema.parse({
+const bizFromForm = (form: FormData, fallbackColor = "#2563eb") =>
+  bizSchema.parse({
     name: str(form, "name"),
     trade: str(form, "trade"),
-    color: str(form, "color") ?? "#2563eb",
+    color: str(form, "color") ?? fallbackColor,
     phone: str(form, "phone"),
     email: str(form, "email"),
     website: str(form, "website"),
   });
+
+export async function createBusiness(form: FormData) {
+  await requirePermission("manage_business");
+  const data = bizFromForm(form);
   let slug = slugify(str(form, "slug") ?? data.name) || "business";
   const taken = await db.select({ slug: businesses.slug }).from(businesses).where(sql`${businesses.slug} like ${slug + "%"}`);
   if (taken.some((t) => t.slug === slug)) slug = `${slug}-${taken.length + 1}`;
@@ -79,29 +57,22 @@ export async function createBusiness(form: FormData) {
 }
 
 export async function updateBusiness(slug: string, form: FormData) {
-  const b = await bizBySlug(slug);
-  const data = bizSchema.parse({
-    name: str(form, "name"),
-    trade: str(form, "trade"),
-    color: str(form, "color") ?? b.color,
-    phone: str(form, "phone"),
-    email: str(form, "email"),
-    website: str(form, "website"),
-  });
-  await db.update(businesses).set(data).where(eq(businesses.id, b.id));
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  await db.update(businesses).set(bizFromForm(form, b.color)).where(eq(businesses.id, b.id));
   revalidatePath("/", "layout");
 }
 
 export async function setBusinessArchived(slug: string, archived: boolean) {
-  await db.update(businesses).set({ archived }).where(eq(businesses.slug, slug));
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  await db.update(businesses).set({ archived }).where(eq(businesses.id, b.id));
   revalidatePath("/", "layout");
   if (archived) redirect("/");
 }
 
-/* ---------- CRM ---------- */
+/* ---------- CRM (all roles) ---------- */
 
 export async function createLead(slug: string, form: FormData) {
-  const b = await bizBySlug(slug);
+  const { business: b, user } = await requireBusiness(slug);
   const source = (str(form, "source") ?? "other") as (typeof schema.leadSource.enumValues)[number];
   const [c] = await db
     .insert(contacts)
@@ -123,12 +94,13 @@ export async function createLead(slug: string, form: FormData) {
     source,
     estimatedValue: dollarsToCents(form.get("estimatedValue")),
     notes: str(form, "notes"),
+    createdById: user.id,
   });
   revalidatePath(`/b/${slug}`, "layout");
 }
 
 export async function setLeadStage(slug: string, leadId: string, form: FormData) {
-  const b = await bizBySlug(slug);
+  const { business: b } = await requireBusiness(slug);
   const stage = req(form, "stage") as (typeof schema.leadStage.enumValues)[number];
   const [lead] = await db
     .update(leads)
@@ -157,27 +129,33 @@ export async function setLeadStage(slug: string, leadId: string, form: FormData)
 /* ---------- jobs ---------- */
 
 export async function updateJob(slug: string, jobId: string, form: FormData) {
-  const b = await bizBySlug(slug);
+  const { business: b, user } = await requireBusiness(slug);
   const status = req(form, "status") as (typeof schema.jobStatus.enumValues)[number];
+  const dates = {
+    status,
+    startDate: str(form, "startDate"),
+    endDate: str(form, "endDate") ?? (status === "completed" ? new Date().toISOString().slice(0, 10) : null),
+  };
+  // Staff can move a job along but never see or change money fields.
+  const money = can(user, "view_financials")
+    ? {
+        contractValue: dollarsToCents(form.get("contractValue")),
+        estimatedCost: dollarsToCents(form.get("estimatedCost")),
+        actualCost: dollarsToCents(form.get("actualCost")),
+      }
+    : {};
   await db
     .update(jobs)
-    .set({
-      status,
-      contractValue: dollarsToCents(form.get("contractValue")),
-      estimatedCost: dollarsToCents(form.get("estimatedCost")),
-      actualCost: dollarsToCents(form.get("actualCost")),
-      startDate: str(form, "startDate"),
-      endDate: str(form, "endDate") ?? (status === "completed" ? new Date().toISOString().slice(0, 10) : null),
-    })
+    .set({ ...dates, ...money })
     .where(and(eq(jobs.id, jobId), eq(jobs.businessId, b.id)));
   revalidatePath(`/b/${slug}`, "layout");
   revalidatePath("/");
 }
 
-/* ---------- invoices & payments ---------- */
+/* ---------- invoices & payments (owner + manager) ---------- */
 
 export async function createInvoice(slug: string, form: FormData) {
-  const b = await bizBySlug(slug);
+  const { business: b, user } = await requireBusiness(slug, "manage_invoices");
   const jobId = req(form, "jobId");
   const [job] = await db.select().from(jobs).where(and(eq(jobs.id, jobId), eq(jobs.businessId, b.id)));
   if (!job) throw new Error("Job not found");
@@ -195,13 +173,14 @@ export async function createInvoice(slug: string, form: FormData) {
     status: "sent",
     issuedAt: issued.toISOString().slice(0, 10),
     dueAt: due.toISOString().slice(0, 10),
+    createdById: user.id,
   });
   revalidatePath(`/b/${slug}`, "layout");
   revalidatePath("/");
 }
 
 export async function recordPayment(slug: string, invoiceId: string, form: FormData) {
-  const b = await bizBySlug(slug);
+  const { business: b, user } = await requireBusiness(slug, "manage_invoices");
   const [inv] = await db.select().from(invoices).where(and(eq(invoices.id, invoiceId), eq(invoices.businessId, b.id)));
   if (!inv) throw new Error("Invoice not found");
   const amount = dollarsToCents(form.get("amount"));
@@ -212,6 +191,7 @@ export async function recordPayment(slug: string, invoiceId: string, form: FormD
     amount,
     method: (str(form, "method") ?? "card") as (typeof schema.paymentMethod.enumValues)[number],
     reference: str(form, "reference"),
+    createdById: user.id,
   });
   const [{ paid }] = await db
     .select({ paid: sql<number>`coalesce(sum(${payments.amount}),0)` })
@@ -226,16 +206,16 @@ export async function recordPayment(slug: string, invoiceId: string, form: FormD
 }
 
 export async function voidInvoice(slug: string, invoiceId: string) {
-  const b = await bizBySlug(slug);
+  const { business: b } = await requireBusiness(slug, "manage_invoices");
   await db.update(invoices).set({ status: "void" }).where(and(eq(invoices.id, invoiceId), eq(invoices.businessId, b.id)));
   revalidatePath(`/b/${slug}`, "layout");
   revalidatePath("/");
 }
 
-/* ---------- schedule ---------- */
+/* ---------- schedule (all roles) ---------- */
 
 export async function createEvent(slug: string, form: FormData) {
-  const b = await bizBySlug(slug);
+  const { business: b, user } = await requireBusiness(slug);
   const date = req(form, "date");
   const start = new Date(`${date}T${str(form, "start") ?? "08:00"}`);
   const end = new Date(`${date}T${str(form, "end") ?? "09:00"}`);
@@ -244,7 +224,8 @@ export async function createEvent(slug: string, form: FormData) {
   let contactId: string | null = null;
   if (jobId) {
     const [j] = await db.select({ contactId: jobs.contactId }).from(jobs).where(and(eq(jobs.id, jobId), eq(jobs.businessId, b.id)));
-    contactId = j?.contactId ?? null;
+    if (!j) throw new Error("Job not found");
+    contactId = j.contactId;
   }
   await db.insert(scheduleEvents).values({
     businessId: b.id,
@@ -256,14 +237,16 @@ export async function createEvent(slug: string, form: FormData) {
     endsAt: end,
     assignee: str(form, "assignee"),
     notes: str(form, "notes"),
+    createdById: user.id,
   });
   revalidatePath(`/b/${slug}`, "layout");
   revalidatePath("/");
 }
 
 export async function deleteEvent(slug: string, eventId: string) {
-  const b = await bizBySlug(slug);
+  const { business: b } = await requireBusiness(slug);
   await db.delete(scheduleEvents).where(and(eq(scheduleEvents.id, eventId), eq(scheduleEvents.businessId, b.id)));
   revalidatePath(`/b/${slug}`, "layout");
   revalidatePath("/");
 }
+

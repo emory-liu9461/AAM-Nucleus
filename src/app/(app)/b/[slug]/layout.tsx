@@ -1,19 +1,19 @@
 import { NavLink } from "@/components/NavLink";
-import { getBusiness } from "@/lib/business";
+import { can, requireBusiness, type Permission } from "@/lib/session";
 
-const TABS = [
-  ["", "Dashboard"],
-  ["/leads", "Leads"],
-  ["/contacts", "Contacts"],
-  ["/jobs", "Jobs"],
-  ["/invoices", "Invoices"],
-  ["/schedule", "Schedule"],
-  ["/settings", "Settings"],
-] as const;
+const TABS: [string, string, Permission | null][] = [
+  ["", "Dashboard", "view_financials"],
+  ["/leads", "Leads", null],
+  ["/contacts", "Contacts", null],
+  ["/jobs", "Jobs", null],
+  ["/invoices", "Invoices", "manage_invoices"],
+  ["/schedule", "Schedule", null],
+  ["/settings", "Settings", "manage_business"],
+];
 
 export default async function BusinessLayout({ children, params }: { children: React.ReactNode; params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const b = await getBusiness(slug);
+  const { business: b, user } = await requireBusiness(slug);
   const base = `/b/${b.slug}`;
   return (
     <div className="space-y-5">
@@ -24,7 +24,7 @@ export default async function BusinessLayout({ children, params }: { children: R
         {b.archived && <span className="pill bg-gray-500/15">Archived</span>}
       </div>
       <nav className="-mx-1 flex gap-1 overflow-x-auto border-b border-line pb-2">
-        {TABS.map(([path, name]) => (
+        {TABS.filter(([, , perm]) => !perm || can(user, perm)).map(([path, name]) => (
           <NavLink key={name} href={base + path} exact={path === ""} className="shrink-0">
             {name}
           </NavLink>

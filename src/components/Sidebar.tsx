@@ -1,34 +1,50 @@
 import Link from "next/link";
-import type { Business } from "@/db/schema";
-import { logout } from "@/app/actions";
+import type { Business, User } from "@/db/schema";
+import { logout } from "@/app/auth-actions";
+import { can } from "@/lib/session";
+import { label } from "@/lib/format";
 import { NavLink } from "./NavLink";
 
-export function Sidebar({ businesses }: { businesses: Business[] }) {
+export function Sidebar({ businesses, user }: { businesses: Business[]; user: User }) {
+  const financials = can(user, "view_financials");
+  const linkFor = (b: Business) => (financials ? `/b/${b.slug}` : `/b/${b.slug}/leads`);
   return (
     <aside className="flex w-full shrink-0 flex-col gap-4 border-b border-line bg-panel p-3 md:sticky md:top-0 md:h-screen md:w-60 md:border-r md:border-b-0">
-      <Link href="/" className="px-2 text-lg font-bold tracking-tight">
+      <Link href={financials ? "/" : businesses[0] ? linkFor(businesses[0]) : "/account"} className="px-2 text-lg font-bold tracking-tight">
         Nucleus
       </Link>
-      <nav className="flex flex-col gap-0.5">
-        <NavLink href="/" exact>
-          <span className="h-2.5 w-2.5 rounded-sm bg-ink" /> All businesses
-        </NavLink>
-      </nav>
+      {financials && businesses.length > 1 && (
+        <nav className="flex flex-col gap-0.5">
+          <NavLink href="/" exact>
+            <span className="h-2.5 w-2.5 rounded-sm bg-ink" /> All businesses
+          </NavLink>
+        </nav>
+      )}
       <div className="flex flex-col gap-0.5">
         <div className="px-2.5 pb-1 text-xs font-medium uppercase tracking-wide text-muted">Businesses</div>
+        {businesses.length === 0 && <p className="px-2.5 text-xs text-muted">No businesses assigned yet.</p>}
         {businesses.map((b) => (
           <NavLink key={b.id} href={`/b/${b.slug}`}>
             <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: b.color }} />
             <span className="truncate">{b.name}</span>
           </NavLink>
         ))}
-        <NavLink href="/businesses/new" className="mt-1">
-          <span className="w-2.5 text-center">+</span> Add business
-        </NavLink>
+        {can(user, "manage_business") && (
+          <NavLink href="/businesses/new" className="mt-1">
+            <span className="w-2.5 text-center">+</span> Add business
+          </NavLink>
+        )}
       </div>
-      <form action={logout} className="mt-auto hidden md:block">
-        <button className="px-2.5 text-sm text-muted hover:text-ink">Sign out</button>
-      </form>
+      <div className="flex flex-col gap-0.5 md:mt-auto">
+        {can(user, "manage_team") && <NavLink href="/team">Team</NavLink>}
+        <NavLink href="/account">
+          <span className="truncate">{user.name}</span>
+          <span className="ml-auto text-xs text-muted">{label(user.role)}</span>
+        </NavLink>
+        <form action={logout}>
+          <button className="px-2.5 py-1.5 text-sm text-muted hover:text-ink">Sign out</button>
+        </form>
+      </div>
     </aside>
   );
 }

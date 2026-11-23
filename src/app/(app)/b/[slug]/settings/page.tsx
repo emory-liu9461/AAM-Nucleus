@@ -1,10 +1,10 @@
 import { setBusinessArchived, updateBusiness } from "@/app/actions";
 import { BusinessForm } from "@/components/BusinessForm";
-import { getBusiness } from "@/lib/business";
+import { requireBusinessPage } from "@/lib/session";
 
 export default async function SettingsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const b = await getBusiness(slug);
+  const { business: b } = await requireBusinessPage(slug, "manage_business");
   return (
     <div className="space-y-6">
       <BusinessForm action={updateBusiness.bind(null, b.slug)} business={b} submit="Save changes" />

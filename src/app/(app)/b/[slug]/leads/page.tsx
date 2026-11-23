@@ -5,7 +5,7 @@ import { getBusiness } from "@/lib/business";
 import { fmtDate, label, money } from "@/lib/format";
 import { Badge } from "@/components/Badge";
 
-const { leads, contacts, leadStage, leadSource } = schema;
+const { leads, contacts, users, leadStage, leadSource } = schema;
 const OPEN = ["new", "contacted", "site_visit", "estimate_sent"] as const;
 
 export default async function LeadsPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ view?: string }> }) {
@@ -14,9 +14,10 @@ export default async function LeadsPage({ params, searchParams }: { params: Prom
   const filter =
     view === "won" ? sql`${leads.stage} = 'won'` : view === "lost" ? sql`${leads.stage} = 'lost'` : view === "all" ? sql`true` : sql`${leads.stage} not in ('won','lost')`;
   const rows = await db
-    .select({ lead: leads, first: contacts.firstName, last: contacts.lastName, phone: contacts.phone })
+    .select({ lead: leads, first: contacts.firstName, last: contacts.lastName, phone: contacts.phone, addedBy: users.name })
     .from(leads)
     .innerJoin(contacts, eq(contacts.id, leads.contactId))
+    .leftJoin(users, eq(users.id, leads.createdById))
     .where(and(eq(leads.businessId, b.id), filter))
     .orderBy(desc(leads.createdAt))
     .limit(300);
@@ -74,17 +75,18 @@ export default async function LeadsPage({ params, searchParams }: { params: Prom
       <section className="card overflow-x-auto p-0">
         <table className="tbl">
           <thead>
-            <tr><th>Customer</th><th>Project</th><th>Source</th><th className="text-right">Value</th><th>Created</th><th>Stage</th></tr>
+            <tr><th>Customer</th><th>Project</th><th>Source</th><th className="text-right">Value</th><th>Created</th><th>Added by</th><th>Stage</th></tr>
           </thead>
           <tbody>
-            {rows.length === 0 && <tr><td colSpan={6} className="py-8 text-center text-muted">No leads here.</td></tr>}
-            {rows.map(({ lead, first, last, phone }) => (
+            {rows.length === 0 && <tr><td colSpan={7} className="py-8 text-center text-muted">No leads here.</td></tr>}
+            {rows.map(({ lead, first, last, phone, addedBy }) => (
               <tr key={lead.id}>
                 <td><div className="font-medium">{first} {last}</div><div className="text-xs text-muted">{phone}</div></td>
                 <td>{lead.title}</td>
                 <td className="text-muted">{label(lead.source)}</td>
                 <td className="text-right">{money(lead.estimatedValue)}</td>
                 <td className="text-muted">{fmtDate(lead.createdAt)}</td>
+                <td className="text-muted">{addedBy ?? "—"}</td>
                 <td>
                   <form action={setLeadStage.bind(null, b.slug, lead.id)} className="flex items-center gap-1">
                     <select name="stage" defaultValue={lead.stage} className="input w-auto py-1 text-xs">

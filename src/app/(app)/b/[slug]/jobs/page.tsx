@@ -1,15 +1,16 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { updateJob } from "@/app/actions";
-import { getBusiness } from "@/lib/business";
-import { label, money, pct } from "@/lib/format";
+import { can, requireBusinessPage } from "@/lib/session";
+import { label, money as fmtMoney, pct } from "@/lib/format";
 import { Badge } from "@/components/Badge";
 
 const { jobs, contacts, invoices, payments, jobStatus } = schema;
 
 export default async function JobsPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ view?: string }> }) {
   const [{ slug }, { view = "active" }] = await Promise.all([params, searchParams]);
-  const b = await getBusiness(slug);
+  const { business: b, user } = await requireBusinessPage(slug);
+  const money = can(user, "view_financials");
   const filter = view === "active" ? sql`${jobs.status} in ('scheduled','in_progress')` : view === "all" ? sql`true` : sql`${jobs.status} = ${view}`;
   const rows = await db
     .select({
@@ -42,8 +43,9 @@ export default async function JobsPage({ params, searchParams }: { params: Promi
               <summary className="flex cursor-pointer flex-wrap items-center gap-x-4 gap-y-1">
                 <span className="min-w-0 flex-1 font-medium">{job.name}<span className="ml-2 text-xs font-normal text-muted">{first} {last}</span></span>
                 <Badge value={job.status} />
-                <span className="text-sm">{money(job.contractValue)}</span>
-                <span className="text-xs text-muted">Billed {money(Number(invoiced))} · Paid {money(Number(paid))} · Margin {pct(margin)}{job.actualCost ? "" : " (est.)"}</span>
+                {money && <span className="text-sm">{fmtMoney(job.contractValue)}</span>}
+                {money && <span className="text-xs text-muted">Billed {fmtMoney(Number(invoiced))} · Paid {fmtMoney(Number(paid))} · Margin {pct(margin)}{job.actualCost ? "" : " (est.)"}</span>}
+                {!money && (job.startDate || job.endDate) && <span className="text-xs text-muted">{job.startDate ?? "?"} → {job.endDate ?? "?"}</span>}
               </summary>
               <form action={updateJob.bind(null, b.slug, job.id)} className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-7">
                 <label className="field">Status
@@ -51,9 +53,13 @@ export default async function JobsPage({ params, searchParams }: { params: Promi
                     {jobStatus.enumValues.map((s) => <option key={s} value={s}>{label(s)}</option>)}
                   </select>
                 </label>
-                <label className="field">Contract ($)<input className="input" name="contractValue" defaultValue={job.contractValue / 100} /></label>
-                <label className="field">Est. cost ($)<input className="input" name="estimatedCost" defaultValue={job.estimatedCost / 100} /></label>
-                <label className="field">Actual cost ($)<input className="input" name="actualCost" defaultValue={job.actualCost / 100} /></label>
+                {money && (
+                  <>
+                    <label className="field">Contract ($)<input className="input" name="contractValue" defaultValue={job.contractValue / 100} /></label>
+                    <label className="field">Est. cost ($)<input className="input" name="estimatedCost" defaultValue={job.estimatedCost / 100} /></label>
+                    <label className="field">Actual cost ($)<input className="input" name="actualCost" defaultValue={job.actualCost / 100} /></label>
+                  </>
+                )}
                 <label className="field">Start<input className="input" type="date" name="startDate" defaultValue={job.startDate ?? ""} /></label>
                 <label className="field">End<input className="input" type="date" name="endDate" defaultValue={job.endDate ?? ""} /></label>
                 <div className="flex items-end"><button className="btn w-full">Save</button></div>

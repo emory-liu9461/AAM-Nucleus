@@ -8,7 +8,10 @@ import {
   timestamp,
   date,
   index,
+  primaryKey,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 /*
  * Every business-owned table carries businessId. Money is stored as integer cents.
@@ -65,6 +68,29 @@ export const eventType = pgEnum("event_type", [
   "other",
 ]);
 
+export const userRole = pgEnum("user_role", ["owner", "manager", "staff"]);
+
+/*
+ * Logins. Owners see every business; managers and staff only see businesses
+ * listed for them in user_businesses. sessionVersion is bumped to sign a user
+ * out everywhere (deactivation, password reset).
+ */
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    passwordHash: text("password_hash").notNull(),
+    role: userRole("role").notNull().default("staff"),
+    active: boolean("active").notNull().default(true),
+    sessionVersion: integer("session_version").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("users_email_idx").on(sql`lower(${t.email})`)],
+);
+
 export const businesses = pgTable("businesses", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
@@ -77,6 +103,19 @@ export const businesses = pgTable("businesses", {
   archived: boolean("archived").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const userBusinesses = pgTable(
+  "user_businesses",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.businessId] })],
+);
 
 export const contacts = pgTable(
   "contacts",
@@ -117,6 +156,7 @@ export const leads = pgTable(
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     closedAt: timestamp("closed_at", { withTimezone: true }),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
   },
   (t) => [index("leads_business_idx").on(t.businessId)],
 );
@@ -162,6 +202,7 @@ export const invoices = pgTable(
     amount: integer("amount").notNull(),
     issuedAt: date("issued_at").notNull(),
     dueAt: date("due_at").notNull(),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("invoices_business_idx").on(t.businessId)],
@@ -181,6 +222,7 @@ export const payments = pgTable(
     method: paymentMethod("method").notNull().default("card"),
     receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
     reference: text("reference"),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
   },
   (t) => [index("payments_business_idx").on(t.businessId)],
 );
@@ -200,10 +242,13 @@ export const scheduleEvents = pgTable(
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     assignee: text("assignee"),
     notes: text("notes"),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
   },
   (t) => [index("events_business_idx").on(t.businessId), index("events_start_idx").on(t.startsAt)],
 );
 
+export type User = typeof users.$inferSelect;
+export type Role = (typeof userRole.enumValues)[number];
 export type Business = typeof businesses.$inferSelect;
 export type Contact = typeof contacts.$inferSelect;
 export type Lead = typeof leads.$inferSelect;

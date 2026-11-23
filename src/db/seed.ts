@@ -8,6 +8,7 @@ import "dotenv/config";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
+import { hashPassword } from "../lib/password";
 
 const client = postgres(process.env.DATABASE_URL!, { max: 1 });
 const db = drizzle(client, { schema });
@@ -54,10 +55,12 @@ async function main() {
   }
   if (reset) {
     await db.delete(schema.businesses); // cascades to everything
+    await db.delete(schema.users);
     console.log("Wiped existing data.");
   }
 
   const now = new Date();
+  const created: string[] = [];
   for (const b of BUSINESSES) {
     const [biz] = await db
       .insert(schema.businesses)
@@ -192,8 +195,25 @@ async function main() {
         assignee: "Owner",
       });
     }
+    created.push(biz.id);
     console.log(`Seeded ${b.name} (${leadCount} leads)`);
   }
+
+  // Demo logins (local only; all use the password "demo-password").
+  const pw = await hashPassword("demo-password");
+  const [, manager, staff] = await db
+    .insert(schema.users)
+    .values([
+      { name: "Demo Owner", email: "owner@example.com", role: "owner", passwordHash: pw },
+      { name: "Demo Manager", email: "manager@example.com", role: "manager", passwordHash: pw },
+      { name: "Demo Staff", email: "staff@example.com", role: "staff", passwordHash: pw },
+    ])
+    .returning();
+  await db.insert(schema.userBusinesses).values([
+    ...created.map((businessId) => ({ userId: manager.id, businessId })),
+    { userId: staff.id, businessId: created[0] },
+  ]);
+  console.log("Demo logins (password: demo-password): owner@example.com, manager@example.com, staff@example.com (Business One only)");
 }
 
 main()
