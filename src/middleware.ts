@@ -3,6 +3,7 @@ import { SESSION_COOKIE, verifySession } from "@/lib/auth";
 
 // Fast gate: rejects requests without a validly signed, unexpired session cookie.
 // Pages and actions then re-check the user is still active (src/lib/session.ts).
+// Public paths: /login, the website quote form (/f/...), the public lead API and embed.js.
 export async function middleware(req: NextRequest) {
   if (await verifySession(req.cookies.get(SESSION_COOKIE)?.value)) return NextResponse.next();
   const url = req.nextUrl.clone();
@@ -12,5 +13,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!login|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!login|f/|api/public/|embed\\.js|_next/static|_next/image|favicon.ico).*)"],
 };

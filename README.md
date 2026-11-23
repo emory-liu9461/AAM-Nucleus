@@ -16,6 +16,19 @@ A web app for running several construction businesses from one place: a combined
 | **Add business** | `/businesses/new`. Each business gets its own data, which rolls into the combined dashboard. You can archive a business to hide it without losing its data. |
 | **Team** (`/team`) | Individual logins (email + password) with roles, per-business access, password resets and deactivation. |
 | **Account** (`/account`) | Change your own name and password. |
+| **Website** (`/b/:slug/website`) | Connect each business's website: an embed code for a quote form, a shareable hosted form link, and a lead API for existing forms, Zapier or Make. Leads arrive in Leads with their source (Google, Facebook, etc.) worked out from ad and UTM tags. |
+
+## Website lead capture
+
+Each business has a public **form key**. You have three ways to connect a website:
+
+1. **Embed:** `<script src="https://APP/embed.js" data-key="KEY" async></script>` adds a branded, self-resizing quote form (an iframe). It remembers the visitor's landing-page ad/UTM tags for the rest of their visit.
+2. **Hosted link:** `https://APP/f/KEY`, for Google Business Profile, social bios, texts and emails. Add `?utm_source=...` to track each one.
+3. **API:** `POST https://APP/api/public/leads/KEY`, JSON or a normal form post. Field names are flexible (`name`/`first_name`, `email`, `phone`, `service`, `message`, `budget`, `utm_*`). Include `_redirect` to send HTML-form visitors back to your own thank-you page.
+
+Protection: an optional allowed-domains list, a hidden honeypot field, 5 submissions per visitor per 10 minutes, and a pause switch. If spam gets through, you can regenerate the key. A repeat customer, matched by email or phone, is attached to their existing contact.
+
+Set `APP_URL` (e.g. `https://app.yourcompany.com`) so the snippets show your own domain rather than whichever address you opened the app from.
 
 ## Users and roles
 

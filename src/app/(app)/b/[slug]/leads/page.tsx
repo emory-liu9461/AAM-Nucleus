@@ -82,11 +82,21 @@ export default async function LeadsPage({ params, searchParams }: { params: Prom
             {rows.map(({ lead, first, last, phone, addedBy }) => (
               <tr key={lead.id}>
                 <td><div className="font-medium">{first} {last}</div><div className="text-xs text-muted">{phone}</div></td>
-                <td>{lead.title}</td>
-                <td className="text-muted">{label(lead.source)}</td>
+                <td>
+                  {lead.title}
+                  {lead.notes && <div className="max-w-xs truncate text-xs text-muted" title={lead.notes}>{lead.notes}</div>}
+                </td>
+                <td className="text-muted">
+                  {label(lead.source)}
+                  {lead.attribution && (
+                    <div className="text-xs" title={lead.attribution.page ?? ""}>
+                      {[lead.attribution.utmMedium, lead.attribution.utmCampaign].filter(Boolean).join(" · ") || "Website form"}
+                    </div>
+                  )}
+                </td>
                 <td className="text-right">{money(lead.estimatedValue)}</td>
                 <td className="text-muted">{fmtDate(lead.createdAt)}</td>
-                <td className="text-muted">{addedBy ?? "—"}</td>
+                <td className="text-muted">{addedBy ?? (lead.attribution ? "Website form" : "—")}</td>
                 <td>
                   <form action={setLeadStage.bind(null, b.slug, lead.id)} className="flex items-center gap-1">
                     <select name="stage" defaultValue={lead.stage} className="input w-auto py-1 text-xs">

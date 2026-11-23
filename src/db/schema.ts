@@ -8,6 +8,7 @@ import {
   timestamp,
   date,
   index,
+  jsonb,
   primaryKey,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -102,6 +103,17 @@ export const businesses = pgTable("businesses", {
   website: text("website"),
   archived: boolean("archived").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // Website lead capture. formKey is public (it's embedded in your website),
+  // so spam is limited by allowedDomains, a honeypot and per-IP rate limiting.
+  formKey: text("form_key")
+    .notNull()
+    .unique()
+    .default(sql`replace(gen_random_uuid()::text, '-', '')`),
+  formEnabled: boolean("form_enabled").notNull().default(true),
+  formHeading: text("form_heading"),
+  formServices: text("form_services"), // one per line; shown as a dropdown
+  formThankYou: text("form_thank_you"),
+  allowedDomains: text("allowed_domains"), // comma/space separated; empty = any
 });
 
 export const userBusinesses = pgTable(
@@ -156,6 +168,8 @@ export const leads = pgTable(
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     closedAt: timestamp("closed_at", { withTimezone: true }),
+    // Where a website lead came from: utm tags, landing page, referrer, form name.
+    attribution: jsonb("attribution").$type<Attribution>(),
     createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
   },
   (t) => [index("leads_business_idx").on(t.businessId)],
@@ -247,6 +261,20 @@ export const scheduleEvents = pgTable(
   (t) => [index("events_business_idx").on(t.businessId), index("events_start_idx").on(t.startsAt)],
 );
 
+export type Attribution = {
+  channel?: "embed" | "hosted" | "api";
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmTerm?: string;
+  utmContent?: string;
+  gclid?: string;
+  fbclid?: string;
+  page?: string;
+  referrer?: string;
+  formName?: string;
+  ipHash?: string;
+};
 export type User = typeof users.$inferSelect;
 export type Role = (typeof userRole.enumValues)[number];
 export type Business = typeof businesses.$inferSelect;

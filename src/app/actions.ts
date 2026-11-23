@@ -250,3 +250,29 @@ export async function deleteEvent(slug: string, eventId: string) {
   revalidatePath("/");
 }
 
+
+/* ---------- website lead capture (owner) ---------- */
+
+export async function updateWebsiteSettings(slug: string, form: FormData) {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  await db
+    .update(businesses)
+    .set({
+      formEnabled: form.get("formEnabled") === "on",
+      formHeading: str(form, "formHeading"),
+      formServices: str(form, "formServices"),
+      formThankYou: str(form, "formThankYou"),
+      allowedDomains: str(form, "allowedDomains"),
+    })
+    .where(eq(businesses.id, b.id));
+  revalidatePath(`/b/${slug}/website`);
+}
+
+export async function regenerateFormKey(slug: string) {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  await db
+    .update(businesses)
+    .set({ formKey: sql`replace(gen_random_uuid()::text, '-', '')` })
+    .where(eq(businesses.id, b.id));
+  revalidatePath(`/b/${slug}/website`);
+}
