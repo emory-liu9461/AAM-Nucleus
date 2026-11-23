@@ -22,7 +22,7 @@ Meta Pixel (IDs set in Nucleus), and preview addresses kept out of Google (noind
 | Name | Example | Purpose |
 |---|---|---|
 | `NUCLEUS_URL` | `https://app.yourcompany.com` | Where content is read from and leads are sent |
-| `DEFAULT_SITE` | `business-one` | Business shown on preview addresses (`*.vercel.app`, localhost). Switch with `?site=<slug>` |
+| `DEFAULT_SITE` | *(optional)* | Business shown on the bare preview address (`*.vercel.app`, localhost). Leave unset and preview with `?site=<slug>` instead |
 
 The website has **no database credentials**. It only reads public content.
 
