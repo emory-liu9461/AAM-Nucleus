@@ -30,8 +30,11 @@ async function bizBySlug(slug: string) {
 /* ---------- auth ---------- */
 
 export async function login(_: unknown, form: FormData) {
-  const password = String(form.get("password") ?? "");
-  if (!safeEqual(password, process.env.OWNER_PASSWORD ?? "")) return { error: "Incorrect password" };
+  const password = String(form.get("password") ?? "").trim();
+  const expected = (process.env.OWNER_PASSWORD ?? "").trim();
+  if (!expected || !process.env.AUTH_SECRET)
+    return { error: "Server not configured: OWNER_PASSWORD and AUTH_SECRET must be set in the hosting environment variables, then redeploy." };
+  if (!safeEqual(password, expected)) return { error: "Incorrect password" };
   (await cookies()).set(SESSION_COOKIE, await expectedToken(), {
     httpOnly: true,
     sameSite: "lax",

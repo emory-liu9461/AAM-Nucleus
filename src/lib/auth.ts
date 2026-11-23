@@ -5,7 +5,7 @@ export const SESSION_COOKIE = "nucleus_session";
 
 export async function expectedToken(): Promise<string> {
   const secret = process.env.AUTH_SECRET;
-  const password = process.env.OWNER_PASSWORD;
+  const password = process.env.OWNER_PASSWORD?.trim();
   if (!secret || !password) throw new Error("AUTH_SECRET and OWNER_PASSWORD must be set");
   const key = await crypto.subtle.importKey(
     "raw",
