@@ -14,13 +14,16 @@ import { sendBusinessEmail } from "@/lib/email";
 import { toE164 } from "@/lib/twilio";
 import { normalizeSiteUrl, websiteBaseUrl } from "@/lib/app-settings";
 import { SOCIAL_CHANNELS, normalizeSocialUrl } from "@/lib/social";
+import { removeAccount, syncBusinessSocial, upsertAccount, youtubeConfigured } from "@/lib/social-sync";
+import { findYouTubeChannel } from "@/lib/social-sync/youtube";
+import { saveStats } from "@/lib/social-sync/store";
 import { isValidTimezone } from "@/lib/availability";
 
 // Every action checks the signed-in user's access first. requireBusiness() 404s
 // if the user isn't assigned to that business; the optional permission argument
 // enforces the role rules in src/lib/session.ts.
 
-const { businesses, contacts, leads, jobs, invoices, payments, scheduleEvents, chatConversations, inboxMessages, appSettings } = schema;
+const { businesses, contacts, leads, jobs, invoices, payments, scheduleEvents, chatConversations, inboxMessages, appSettings, socialAccounts } = schema;
 
 const str = (f: FormData, k: string) => {
   const v = f.get(k);
@@ -516,4 +519,76 @@ export async function updateSocialLinks(slug: string, _: { error?: string; ok?: 
   await db.update(businesses).set({ site: { ...(b.site ?? {}), social } }).where(eq(businesses.id, b.id));
   revalidatePath(`/b/${slug}/social`, "layout");
   return { ok: `Saved ${Object.keys(social).length} profile link${Object.keys(social).length === 1 ? "" : "s"}. They appear on your website within about a minute.` };
+}
+
+/* ---------- social stats (owner) ---------- */
+
+export async function connectYouTube(slug: string, _: { error?: string; ok?: string } | null, form: FormData) {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  if (!youtubeConfigured()) return { error: "Add YOUTUBE_API_KEY in Vercel first (see the setup steps below)." };
+  try {
+    const ch = await findYouTubeChannel(str(form, "channel") ?? "");
+    await upsertAccount(b.id, "youtube", { externalId: ch.id, name: ch.name });
+    const [r] = await syncBusinessSocial(b).then((rs) => rs.filter((x) => x.channel === "youtube"));
+    revalidatePath(`/b/${slug}/social`, "layout");
+    return r?.ok === false ? { error: `Connected ${ch.name}, but syncing failed: ${r.error}` } : { ok: `Connected ${ch.name}.` };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Couldn't connect YouTube." };
+  }
+}
+
+export async function syncSocialNow(slug: string, _: { error?: string; ok?: string } | null) {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  const results = await syncBusinessSocial(b);
+  revalidatePath(`/b/${slug}/social`, "layout");
+  if (!results.length) return { error: "Nothing connected yet." };
+  const failed = results.filter((r) => !r.ok);
+  return failed.length ? { error: `Updated ${results.length - failed.length} of ${results.length}. Problems: ${failed.map((f) => `${f.channel}: ${f.error}`).join(" · ")}` } : { ok: `Updated ${results.length} connected account${results.length === 1 ? "" : "s"}.` };
+}
+
+export async function disconnectSocial(slug: string, channel: string) {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  await removeAccount(b.id, channel);
+  revalidatePath(`/b/${slug}/social`, "layout");
+}
+
+/** Pick which Google location / Facebook Page to track when the account has several. */
+export async function chooseSocialAccount(slug: string, channel: "google" | "facebook", form: FormData) {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  const choice = str(form, "choice");
+  const [acc] = await db.select().from(socialAccounts).where(and(eq(socialAccounts.businessId, b.id), eq(socialAccounts.channel, channel)));
+  if (!acc || !choice) return;
+  const choices = JSON.parse(acc.meta?.choices ?? "[]") as { id: string; name: string; token?: string; ig?: string | null }[];
+  const c = choices.find((x) => x.id === choice);
+  if (!c) return;
+  if (channel === "google") {
+    await db.update(socialAccounts).set({ externalId: c.id, name: c.name, lastError: null }).where(eq(socialAccounts.id, acc.id));
+  } else {
+    await db.update(socialAccounts).set({ externalId: c.id, name: c.name, accessToken: c.token ?? acc.accessToken, lastError: null }).where(eq(socialAccounts.id, acc.id));
+    if (c.ig) await db.insert(socialAccounts).values({ businessId: b.id, channel: "instagram", externalId: c.ig, name: `${c.name} (Instagram)`, accessToken: c.token ?? acc.accessToken })
+      .onConflictDoUpdate({ target: [socialAccounts.businessId, socialAccounts.channel], set: { externalId: c.ig, name: `${c.name} (Instagram)`, accessToken: c.token ?? acc.accessToken, lastError: null } });
+    else await removeAccount(b.id, "instagram");
+  }
+  await syncBusinessSocial(b);
+  revalidatePath(`/b/${slug}/social`, "layout");
+}
+
+/** Numbers typed in by hand for channels without an API (HomeStars, Houzz, TikTok…), or to fill gaps. */
+export async function saveManualStats(slug: string, _: { error?: string; ok?: string } | null, form: FormData) {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  const channel = str(form, "channel") ?? "";
+  if (!SOCIAL_CHANNELS.some((c) => c.key === channel)) return { error: "Pick a channel" };
+  const n = (k: string) => {
+    const v = str(form, k);
+    if (v === null) return null;
+    const x = Number(v.replace(/[,\s]/g, ""));
+    return Number.isFinite(x) && x >= 0 ? x : NaN;
+  };
+  const vals = { followers: n("followers"), views: n("views"), likes: n("likes"), comments: n("comments"), reviewsCount: n("reviewsCount"), rating: n("rating") };
+  if (Object.values(vals).some((v) => Number.isNaN(v))) return { error: "Numbers only, please" };
+  if (vals.rating !== null && (vals.rating < 1 || vals.rating > 5)) return { error: "Rating should be between 1 and 5" };
+  if (Object.values(vals).every((v) => v === null)) return { error: "Enter at least one number" };
+  await saveStats(b.id, channel, vals, "manual");
+  revalidatePath(`/b/${slug}/social`, "layout");
+  return { ok: `Saved today's numbers for ${SOCIAL_CHANNELS.find((c) => c.key === channel)!.name}.` };
 }

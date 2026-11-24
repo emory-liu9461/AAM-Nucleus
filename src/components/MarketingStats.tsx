@@ -3,6 +3,7 @@ import type { Business } from "@/db/schema";
 import type { MarketingMetrics } from "@/lib/metrics";
 import { label, pct } from "@/lib/format";
 import { Kpi } from "./Kpi";
+import type { SocialSummary } from "@/lib/social-stats";
 
 const SOURCE_LABEL: Record<string, string> = {
   direct: "Direct / typed in", google: "Google", facebook: "Facebook", instagram: "Instagram", tiktok: "TikTok", youtube: "YouTube",
@@ -25,7 +26,7 @@ function Bars({ rows, empty }: { rows: [string, number][]; empty: string }) {
 }
 
 /** Marketing section of the dashboard: website traffic, calls, texts, email and where leads come from. */
-export function MarketingStats({ m, per, list }: { m: MarketingMetrics; per: MarketingMetrics[]; list: Business[] }) {
+export function MarketingStats({ m, per, list, social }: { m: MarketingMetrics; per: MarketingMetrics[]; list: Business[]; social: SocialSummary }) {
   const conversion = m.visits ? m.websiteLeads / m.visits : null;
   const answerRate = m.calls ? m.callsAnswered / m.calls : null;
   // Website names (angi.com) keep their spelling; tags (google, newsletter) get capitalized.
@@ -43,6 +44,18 @@ export function MarketingStats({ m, per, list }: { m: MarketingMetrics; per: Mar
         <Kpi label="Booked by the AI assistant" value={m.aiBookings.toLocaleString()} sub="site visits & calls from chat, text and email" />
         <Kpi label="Call answer rate" value={pct(answerRate)} sub={m.callsMissed ? `${m.callsMissed} missed calls to follow up` : "of incoming calls"} tone={answerRate !== null && answerRate < 0.6 ? "bad" : answerRate !== null ? "good" : undefined} />
         <Kpi label="Visit → lead rate" value={pct(conversion)} sub="website leads ÷ website visits" />
+      </div>
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-muted">Social media &amp; reviews</h3>
+          {list.length === 1 && <Link href={`/b/${list[0].slug}/social/stats`} className="text-xs text-accent hover:underline">Social stats →</Link>}
+        </div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Kpi label="Followers" value={social.followers?.toLocaleString() ?? "—"} sub={social.followerGrowth !== null ? `${social.followerGrowth >= 0 ? "+" : ""}${social.followerGrowth.toLocaleString()} in 30 days` : `${social.channels} channel${social.channels === 1 ? "" : "s"} tracked`} tone={social.followerGrowth !== null ? (social.followerGrowth >= 0 ? "good" : "bad") : undefined} />
+          <Kpi label="Reviews" value={social.reviews?.toLocaleString() ?? "—"} sub={social.rating ? `${social.rating.toFixed(1)} ★ average` : "connect Google or enter by hand"} />
+          <Kpi label="New reviews" value={social.newReviews.toLocaleString()} sub={social.newReviews ? `${social.newReviewRating?.toFixed(1) ?? "—"} ★ · ${social.unreplied} need a reply` : "in this period"} tone={social.unreplied ? "bad" : undefined} />
+          <Kpi label="New comments" value={social.newComments.toLocaleString()} sub={`in this period${social.likes !== null ? ` · ${social.likes.toLocaleString()} recent likes` : ""}`} />
+        </div>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="card">

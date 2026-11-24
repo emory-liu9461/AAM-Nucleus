@@ -15,5 +15,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!login|f/|api/public/|api/twilio/|api/email/inbound/|embed\\.js|brand/|icon\\.svg|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!login|f/|api/public/|api/twilio/|api/email/inbound/|api/cron/|embed\\.js|brand/|icon\\.svg|_next/static|_next/image|favicon.ico).*)"],
 };

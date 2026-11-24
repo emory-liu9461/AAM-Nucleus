@@ -63,6 +63,16 @@ How it works:
 
 Env: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `POSTMARK_SERVER_TOKEN`, `POSTMARK_INBOUND_TOKEN`, `APP_URL`, `ANTHROPIC_API_KEY`. US texting also needs A2P 10DLC registration in Twilio.
 
+## Social stats
+
+Social → **Social stats** collects reviews, followers, views, likes and comments:
+- **Google Business Profile** (OAuth, `business.manage`): reviews with text, stars and reply status; rating; profile views, calls, website clicks and direction requests over the last 28 days. Your Google Cloud project needs Business Profile API access approved by Google.
+- **Facebook + Instagram** (Meta OAuth): Page followers, likes and comments on recent posts, comment text, and views where Meta provides them; the same for the linked Instagram professional account.
+- **YouTube** (API key): subscribers, total views, likes and comments on recent videos, and the newest comments.
+- **Every other channel** (HomeStars, Houzz, Yelp, TikTok, LinkedIn, Nextdoor…): numbers entered by hand.
+
+Connected accounts sync every morning (`/api/cron/social-sync`, Vercel Cron, protected by `CRON_SECRET`) and on **Update now**. Tokens are stored encrypted (AES-256-GCM, key derived from `AUTH_SECRET`). Each platform's API code lives in `src/lib/social-sync/` (`google.ts`, `meta.ts`, `youtube.ts`). If a platform changes its API, the exact error shows on that account's card. The dashboard's Marketing section shows followers and growth, reviews and the average rating, new reviews (and how many need a reply), and new comments.
+
 ## Website visit counting
 
 The website sends one small, cookie-free beacon per page view to `POST /api/public/track/{formKey}`. A per-tab session id groups page views into a visit, and the source comes from ad/UTM tags or the referring site. Bots and headless browsers are ignored, as are views inside the Nucleus live preview and thank-you pages.

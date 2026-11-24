@@ -64,6 +64,13 @@
       "when": 1795530985136,
       "tag": "0008_site_visits",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795532165709,
+      "tag": "0009_social_stats",
+      "breakpoints": true
     }
   ]
 }

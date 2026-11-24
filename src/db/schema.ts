@@ -438,6 +438,77 @@ export const siteVisits = pgTable(
   (t) => [index("visits_business_idx").on(t.businessId, t.createdAt)],
 );
 
+/** A connected social/review account (Google Business Profile, Facebook Page, Instagram, YouTube). */
+export const socialAccounts = pgTable(
+  "social_accounts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    channel: text("channel").notNull(), // google | facebook | instagram | youtube
+    externalId: text("external_id").notNull(), // location name, page id, IG user id, YouTube channel id
+    name: text("name"),
+    accessToken: text("access_token"), // encrypted (AES-256-GCM)
+    refreshToken: text("refresh_token"), // encrypted
+    tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
+    meta: jsonb("meta").$type<Record<string, string>>(),
+    lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("social_accounts_unique").on(t.businessId, t.channel)],
+);
+
+/**
+ * One row per business, channel and day: totals (followers, reviews, rating) and
+ * recent activity (views, likes, comments over the last ~28 days), from an API sync
+ * or typed in by hand.
+ */
+export const socialStats = pgTable(
+  "social_stats",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    channel: text("channel").notNull(),
+    day: date("day").notNull(),
+    followers: integer("followers"),
+    views: integer("views"),
+    likes: integer("likes"),
+    comments: integer("comments"),
+    reviewsCount: integer("reviews_count"),
+    rating: text("rating"), // decimal as text, e.g. "4.8"
+    extra: jsonb("extra").$type<Record<string, number>>(), // e.g. Google calls / website clicks
+    source: text("source").$type<"api" | "manual">().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("social_stats_day").on(t.businessId, t.channel, t.day)],
+);
+
+/** Individual reviews and comments pulled from connected accounts. */
+export const socialItems = pgTable(
+  "social_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    channel: text("channel").notNull(),
+    kind: text("kind").$type<"review" | "comment">().notNull(),
+    externalId: text("external_id").notNull(),
+    author: text("author"),
+    text: text("text"),
+    rating: integer("rating"),
+    url: text("url"),
+    replied: boolean("replied").notNull().default(false),
+    postedAt: timestamp("posted_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("social_items_unique").on(t.businessId, t.channel, t.externalId), index("social_items_recent").on(t.businessId, t.postedAt)],
+);
+
 /** App-wide settings editable in Nucleus (e.g. the website project's address). */
 export const appSettings = pgTable("app_settings", {
   key: text("key").primaryKey(),

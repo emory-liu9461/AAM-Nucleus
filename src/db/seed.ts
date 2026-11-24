@@ -233,6 +233,22 @@ async function main() {
     if (msgs.length) await db.insert(schema.inboxMessages).values(msgs);
   }
 
+  // Demo social numbers (local demo only): a snapshot 35 days ago and today.
+  for (const [i, businessId] of created.entries()) {
+    const today = new Date().toISOString().slice(0, 10);
+    const before = new Date(Date.now() - 35 * day).toISOString().slice(0, 10);
+    const rows = [
+      { channel: "google", reviewsCount: 40 + i * 25, rating: i ? "4.7" : "4.9", views: 2100 + i * 800, source: "api" as const },
+      { channel: "facebook", followers: 820 + i * 300, likes: 140, comments: 22, views: 5400, source: "api" as const },
+      { channel: "instagram", followers: 610 + i * 450, likes: 390, comments: 41, views: 9100, source: "api" as const },
+      { channel: "homestars", reviewsCount: 18 + i * 9, rating: "4.8", source: "manual" as const },
+    ];
+    for (const r of rows) {
+      await db.insert(schema.socialStats).values({ businessId, day: today, ...r });
+      if ("followers" in r) await db.insert(schema.socialStats).values({ businessId, channel: r.channel, day: before, followers: Math.round((r.followers as number) * 0.9), source: r.source });
+    }
+  }
+
   // Demo painting business with a ready-to-view sample website (no fake reviews).
   const [painting] = await db
     .insert(schema.businesses)
