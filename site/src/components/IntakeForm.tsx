@@ -108,7 +108,7 @@ export function IntakeForm({ endpoint, services, defaultService }: { endpoint: s
         <legend className="sr-only">The property</legend>
         <label className="field sm:col-span-2">Project address *<input className="input" name="address" autoComplete="street-address" required /></label>
         <label className="field">City<input className="input" name="city" autoComplete="address-level2" /></label>
-        <label className="field">ZIP code *<input className="input" name="zip" autoComplete="postal-code" inputMode="numeric" pattern="[0-9A-Za-z \-]{3,10}" required /></label>
+        <label className="field">Postal / ZIP code *<input className="input" name="zip" autoComplete="postal-code" autoCapitalize="characters" pattern="[0-9A-Za-z \-]{3,10}" required /></label>
         <Choice name="property_type" label="Property type" options={PROPERTY} />
         <Choice name="homeowner" label="Do you own the property?" options={["Yes", "No, I rent", "I manage it for the owner"]} />
       </fieldset>

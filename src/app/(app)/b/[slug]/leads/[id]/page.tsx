@@ -16,7 +16,7 @@ const INTAKE_LABELS: [keyof NonNullable<typeof leads.$inferSelect.intake>, strin
   ["budgetRange", "Budget"],
   ["propertyType", "Property type"],
   ["homeowner", "Owns the property"],
-  ["zip", "ZIP code"],
+  ["zip", "Postal / ZIP code"],
   ["contactMethod", "Best way to reach"],
   ["bestTime", "Best time"],
   ["preferredDate", "Preferred site visit"],

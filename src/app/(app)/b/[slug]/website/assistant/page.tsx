@@ -17,7 +17,23 @@ const CHAT_STATUS = {
 } as const;
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const ZONES = ["America/New_York", "America/Chicago", "America/Denver", "America/Phoenix", "America/Los_Angeles", "America/Anchorage", "Pacific/Honolulu"];
+// Canadian and US time zones (label, IANA name).
+const ZONES: [string, string][] = [
+  ["Canada – Pacific (Vancouver)", "America/Vancouver"],
+  ["Canada – Mountain (Edmonton, Calgary)", "America/Edmonton"],
+  ["Canada – Saskatchewan (Regina)", "America/Regina"],
+  ["Canada – Central (Winnipeg)", "America/Winnipeg"],
+  ["Canada – Eastern (Toronto, Ottawa, Montréal)", "America/Toronto"],
+  ["Canada – Atlantic (Halifax)", "America/Halifax"],
+  ["Canada – Newfoundland (St. John's)", "America/St_Johns"],
+  ["US – Eastern", "America/New_York"],
+  ["US – Central", "America/Chicago"],
+  ["US – Mountain", "America/Denver"],
+  ["US – Arizona", "America/Phoenix"],
+  ["US – Pacific", "America/Los_Angeles"],
+  ["US – Alaska", "America/Anchorage"],
+  ["US – Hawaii", "Pacific/Honolulu"],
+];
 
 export default async function AssistantPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -60,7 +76,7 @@ export default async function AssistantPage({ params }: { params: Promise<{ slug
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="field">Time zone
               <select className="input" name="timezone" defaultValue={s.timezone}>
-                {(ZONES.includes(s.timezone) ? ZONES : [s.timezone, ...ZONES]).map((z) => <option key={z} value={z}>{z.replace("America/", "").replace("_", " ")}</option>)}
+                {(ZONES.some(([, z]) => z === s.timezone) ? ZONES : [[s.timezone, s.timezone] as [string, string], ...ZONES]).map(([l, z]) => <option key={z} value={z}>{l}</option>)}
               </select>
             </label>
             <label className="field">Appointments start<input className="input" type="time" name="start" defaultValue={s.start} /></label>
