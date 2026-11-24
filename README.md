@@ -47,6 +47,21 @@ How it's built: Claude (`claude-opus-5-5`, low effort, with server-side refusal 
 
 Requires `ANTHROPIC_API_KEY` in the Nucleus project's environment variables.
 
+## Inbox: phone calls, texts and email
+
+Each business gets an **Inbox** tab:
+- **Messages:** texts and emails in one list, with AI replies and staff replies. A staff reply pauses the AI for that conversation, and you can hand it back. "STOP" opt-outs are respected.
+- **Calls:** answered, missed and voicemail calls, with voicemails playable in Nucleus.
+- **Settings** (owner only): Twilio number, phones to ring, voicemail, missed-call text-back, AI text replies, email addresses, AI email replies, signature, and step-by-step setup with the exact webhook addresses.
+
+How it works:
+- **Calls (Twilio):** `POST /api/twilio/voice` rings every forwarding phone at once, after announcing which business the call is for. If nobody answers, `/voice/after` takes a voicemail and sends a missed-call text that the AI follows up.
+- **Texts (Twilio):** `POST /api/twilio/sms` replies to Twilio immediately, then the AI (the same assistant as the website chat, in a short SMS style) replies in the background and can book site visits.
+- **Email (Postmark):** `POST /api/email/inbound/{POSTMARK_INBOUND_TOKEN}`. The AI replies in the same thread (In-Reply-To), and never answers newsletters, auto-replies, bounces or itself.
+- Every Twilio request is verified with Twilio's signature (needs `APP_URL` to match the address set in Twilio). Postmark is verified by the secret in the URL. One AI reply runs at a time per conversation.
+
+Env: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `POSTMARK_SERVER_TOKEN`, `POSTMARK_INBOUND_TOKEN`, `APP_URL`, `ANTHROPIC_API_KEY`. US texting also needs A2P 10DLC registration in Twilio.
+
 ## Users and roles
 
 | Role | Can see and do |

@@ -3,13 +3,14 @@ import { updateSiteContent } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { requireBusinessPage } from "@/lib/session";
 import { publicSite } from "@/lib/site-defaults";
+import { websiteBaseUrl } from "@/lib/app-settings";
 
 export default async function SiteContentPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const { business: b } = await requireBusinessPage(slug, "manage_business");
   const c = b.site ?? {};
   const d = publicSite(b).content; // defaults shown as placeholders
-  const previewBase = process.env.SITE_PREVIEW_URL?.replace(/\/$/, "");
+  const previewBase = await websiteBaseUrl();
 
   return (
     <div className="max-w-4xl space-y-5">
@@ -35,8 +36,7 @@ export default async function SiteContentPage({ params }: { params: Promise<{ sl
         </section>
       ) : (
         <p className="card text-sm text-muted">
-          To preview the website here, deploy the website project and add <code>SITE_PREVIEW_URL</code> (its vercel.app address) to this
-          Nucleus project&apos;s environment variables.
+          To preview the website here, enter your website project&apos;s address under <Link className="text-accent hover:underline" href={`/b/${b.slug}/website`}>Website → Link to your website project</Link>.
         </p>
       )}
 

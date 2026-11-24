@@ -6,6 +6,7 @@ import { can, requireBusiness, type Permission } from "@/lib/session";
 const TABS: [string, string, Permission | null][] = [
   ["", "Dashboard", "view_financials"],
   ["/leads", "Leads", null],
+  ["/inbox", "Inbox", null],
   ["/contacts", "Contacts", null],
   ["/jobs", "Jobs", null],
   ["/invoices", "Invoices", "manage_invoices"],
@@ -23,6 +24,14 @@ export default async function BusinessLayout({ children, params }: { children: R
     .from(schema.leads)
     .where(and(eq(schema.leads.businessId, b.id), eq(schema.leads.stage, "new")));
   const newLeads = Number(n);
+  // Conversations whose latest message is from the customer (waiting for a reply).
+  const waiting = await db.execute(sql`
+    select count(*)::int as n from (
+      select distinct on (m.conversation_id) m.author
+      from inbox_messages m where m.business_id = ${b.id} and m.created_at > now() - interval '14 days'
+      order by m.conversation_id, m.created_at desc
+    ) x where x.author = 'customer'`);
+  const inboxWaiting = Number((waiting as unknown as { n: number }[])[0]?.n ?? 0);
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2 text-sm text-muted">
@@ -35,6 +44,9 @@ export default async function BusinessLayout({ children, params }: { children: R
         {TABS.filter(([, , perm]) => !perm || can(user, perm)).map(([path, name]) => (
           <NavLink key={name} href={base + path} exact={path === ""} className="shrink-0">
             {name}
+            {name === "Inbox" && inboxWaiting > 0 && (
+              <span className="rounded-full bg-accent px-1.5 text-[11px] font-semibold leading-5 text-white" title={`${inboxWaiting} waiting for a reply`}>{inboxWaiting}</span>
+            )}
             {name === "Leads" && newLeads > 0 && (
               <span className="rounded-full bg-accent px-1.5 text-[11px] font-semibold leading-5 text-white" title={`${newLeads} new`}>{newLeads}</span>
             )}

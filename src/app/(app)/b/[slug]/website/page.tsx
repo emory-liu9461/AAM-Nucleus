@@ -7,6 +7,9 @@ import { CopyField } from "@/components/CopyField";
 import { fmtDate, label } from "@/lib/format";
 import { RATE_LIMIT } from "@/lib/intake";
 import { requireBusinessPage } from "@/lib/session";
+import { websiteBaseUrl } from "@/lib/app-settings";
+import { setWebsiteUrl, testWebsiteLink } from "@/app/actions";
+import { ActionForm } from "@/components/ActionForm";
 
 const { leads, contacts } = schema;
 
@@ -17,7 +20,7 @@ export default async function WebsitePage({ params }: { params: Promise<{ slug: 
   const appUrl = process.env.APP_URL?.replace(/\/$/, "") || `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
   const formUrl = `${appUrl}/f/${b.formKey}`;
   // The live domain if one is connected, otherwise the website project's preview address.
-  const previewBase = process.env.SITE_PREVIEW_URL?.replace(/\/$/, "");
+  const previewBase = await websiteBaseUrl();
   const siteLink = b.domain ? `https://${b.domain}` : previewBase ? `${previewBase}/?site=${b.slug}` : null;
   const apiUrl = `${appUrl}/api/public/leads/${b.formKey}`;
   const embed = `<script src="${appUrl}/embed.js" data-key="${b.formKey}" async></script>`;
@@ -58,9 +61,28 @@ export default async function WebsitePage({ params }: { params: Promise<{ slug: 
       <section className="card flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="card-title mb-1">Your website</div>
-          <p className="text-sm text-muted">
-            {b.domain ? <>Live at <a className="text-accent hover:underline" href={`https://${b.domain}`} target="_blank" rel="noreferrer">{b.domain}</a>, built from the Nucleus website template.</> : siteLink ? "Preview address (no domain connected yet). Connect a domain on Edit website content." : "Use the Nucleus website template: fill in your content and connect a domain."}
-          </p>
+          {b.domain ? (
+            <p className="text-sm text-muted">
+              <span className="font-medium text-good">● Live</span> at{" "}
+              <a className="text-accent hover:underline" href={`https://${b.domain}`} target="_blank" rel="noreferrer">{b.domain}</a>
+              {previewBase && <> · preview copy at <a className="text-accent hover:underline" href={`${previewBase}/?site=${b.slug}`} target="_blank" rel="noreferrer">{previewBase.replace(/^https?:\/\//, "")}</a></>}
+            </p>
+          ) : siteLink ? (
+            <div className="space-y-1 text-sm text-muted">
+              <p>
+                <span className="font-medium text-good">● Live</span> at{" "}
+                <a className="break-all text-accent hover:underline" href={siteLink} target="_blank" rel="noreferrer">{siteLink.replace(/^https?:\/\//, "")}</a>
+              </p>
+              <p className="text-xs">
+                Optional: give it its own address like yourbusiness.com. Enter the domain on{" "}
+                <Link className="text-accent hover:underline" href={`/b/${b.slug}/website/content`}>Edit website content</Link>, then add the same domain to the website project in Vercel.
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted">
+              Not linked yet. Enter your website project&apos;s address below under &ldquo;Link to your website project&rdquo;.
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           {siteLink ? (
@@ -71,6 +93,24 @@ export default async function WebsitePage({ params }: { params: Promise<{ slug: 
           <Link href={`/b/${b.slug}/website/content`} className="btn-ghost">Edit website content</Link>
           <Link href={`/b/${b.slug}/website/assistant`} className="btn-ghost">AI assistant{b.assistant?.enabled ? " (on)" : ""}</Link>
         </div>
+      </section>
+
+      <section className="card space-y-3">
+        <div>
+          <div className="card-title mb-1">Link to your website project</div>
+          <p className="text-sm text-muted">
+            The address of your website project in Vercel (the one with Root Directory <code>site</code>). One address serves every business; Nucleus adds
+            <code> ?site={b.slug}</code> for this one. In that project, <code>NUCLEUS_URL</code> must be this Nucleus address: <code>{appUrl}</code>
+          </p>
+        </div>
+        <ActionForm action={setWebsiteUrl} submit="Save link" className="flex flex-wrap items-start gap-2">
+          <input className="input min-w-0 flex-1" name="websiteUrl" defaultValue={previewBase ?? ""} placeholder="https://aam-nucleus-site.vercel.app" />
+        </ActionForm>
+        {previewBase && (
+          <ActionForm action={testWebsiteLink.bind(null, b.slug)} submit="Test link" pendingText="Testing…" className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-muted">Check that the website shows {b.name} and sends quote requests here:</span>
+          </ActionForm>
+        )}
       </section>
 
       <p className="text-sm text-muted">Already have a different website? Connect it to Nucleus with any of these:</p>

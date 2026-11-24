@@ -37,6 +37,7 @@ export const leadSource = pgEnum("lead_source", [
   "repeat",
   "walk_in",
   "other",
+  "phone",
 ]);
 
 export const jobStatus = pgEnum("job_status", [
@@ -71,6 +72,10 @@ export const eventType = pgEnum("event_type", [
 ]);
 
 export const chatStatus = pgEnum("chat_status", ["open", "booked", "handoff", "closed"]);
+export const chatChannel = pgEnum("chat_channel", ["web", "sms", "email"]);
+export const inboxChannel = pgEnum("inbox_channel", ["sms", "email"]);
+export const messageAuthor = pgEnum("message_author", ["customer", "assistant", "staff", "system"]);
+export const callStatus = pgEnum("call_status", ["ringing", "answered", "missed", "voicemail"]);
 
 export const userRole = pgEnum("user_role", ["owner", "manager", "staff"]);
 
@@ -122,6 +127,10 @@ export const businesses = pgTable("businesses", {
   site: jsonb("site").$type<SiteContent>(),
   // AI website assistant: on/off, booking hours and owner-written facts.
   assistant: jsonb("assistant").$type<AssistantSettings>(),
+  // Twilio phone number, call forwarding and automatic texting.
+  phoneSettings: jsonb("phone_settings").$type<PhoneSettings>(),
+  // Email address customers write to, and automatic AI replies.
+  emailSettings: jsonb("email_settings").$type<EmailSettings>(),
 });
 
 export const userBusinesses = pgTable(
@@ -153,6 +162,7 @@ export const contacts = pgTable(
     state: text("state"),
     zip: text("zip"),
     source: leadSource("source").notNull().default("other"),
+    smsOptOut: boolean("sms_opt_out").notNull().default(false), // replied STOP
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -328,6 +338,9 @@ export const chatConversations = pgTable(
       .notNull()
       .references(() => businesses.id, { onDelete: "cascade" }),
     token: text("token").notNull(), // secret the visitor's browser holds to continue the chat
+    channel: chatChannel("channel").notNull().default("web"),
+    address: text("address"), // customer's phone (E.164) for texts, or email address for email
+    aiPaused: boolean("ai_paused").notNull().default(false), // staff took over
     status: chatStatus("status").notNull().default("open"),
     messages: jsonb("messages").$type<unknown[]>().notNull().default([]),
     userTurns: integer("user_turns").notNull().default(0),
@@ -341,6 +354,79 @@ export const chatConversations = pgTable(
   },
   (t) => [index("chat_business_idx").on(t.businessId, t.updatedAt)],
 );
+
+/** Every text message and email sent or received, for the Inbox. */
+export const inboxMessages = pgTable(
+  "inbox_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    channel: inboxChannel("channel").notNull(),
+    conversationId: uuid("conversation_id").references(() => chatConversations.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+    direction: text("direction").$type<"in" | "out">().notNull(),
+    author: messageAuthor("author").notNull(),
+    subject: text("subject"),
+    body: text("body").notNull(),
+    fromAddr: text("from_addr").notNull(),
+    toAddr: text("to_addr").notNull(),
+    externalId: text("external_id"), // Twilio message SID or email Message-ID
+    status: text("status"), // received, sent, failed
+    sentById: uuid("sent_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("inbox_conv_idx").on(t.conversationId, t.createdAt), index("inbox_contact_idx").on(t.contactId)],
+);
+
+/** Phone calls to a business number. */
+export const calls = pgTable(
+  "calls",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+    callSid: text("call_sid").notNull().unique(),
+    fromNumber: text("from_number").notNull(),
+    toNumber: text("to_number").notNull(),
+    status: callStatus("status").notNull().default("ringing"),
+    durationSec: integer("duration_sec"),
+    recordingUrl: text("recording_url"),
+    recordingSeconds: integer("recording_seconds"),
+    textedBack: boolean("texted_back").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("calls_business_idx").on(t.businessId, t.createdAt)],
+);
+
+export type EmailSettings = {
+  inboundAddress?: string; // address that forwards into Nucleus (e.g. hello@yourcompany.com)
+  fromAddress?: string; // replies are sent from this address (verified in Postmark)
+  fromName?: string;
+  aiReplies?: boolean;
+  signature?: string;
+};
+
+export type PhoneSettings = {
+  number?: string; // the business's Twilio number, E.164 (+15551234567)
+  forwardTo?: string[]; // phones that ring for incoming calls, E.164
+  ringSeconds?: number;
+  whisper?: boolean; // announce "Call for <business>" when you answer
+  voicemail?: boolean;
+  missedCallTextBack?: boolean;
+  missedCallMessage?: string;
+  smsAssistant?: boolean; // AI replies to texts
+};
+
+/** App-wide settings editable in Nucleus (e.g. the website project's address). */
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export type AssistantSettings = {
   enabled?: boolean;
@@ -364,3 +450,5 @@ export type Invoice = typeof invoices.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type ScheduleEvent = typeof scheduleEvents.$inferSelect;
 export type ChatConversation = typeof chatConversations.$inferSelect;
+export type InboxMessage = typeof inboxMessages.$inferSelect;
+export type Call = typeof calls.$inferSelect;

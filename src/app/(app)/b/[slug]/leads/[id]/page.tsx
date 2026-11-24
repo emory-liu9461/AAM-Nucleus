@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { setLeadStage } from "@/app/actions";
 import { Badge } from "@/components/Badge";
@@ -37,7 +37,15 @@ export default async function LeadDetail({ params }: { params: Promise<{ slug: s
   const { lead, contact: c, addedBy } = row;
   const [job] = await db.select({ id: jobs.id, name: jobs.name, status: jobs.status }).from(jobs).where(eq(jobs.leadId, lead.id));
   const others = await db.select({ id: leads.id, title: leads.title, stage: leads.stage, createdAt: leads.createdAt }).from(leads).where(and(eq(leads.contactId, c.id), eq(leads.businessId, b.id)));
-  const [chat] = await db.select().from(schema.chatConversations).where(and(eq(schema.chatConversations.leadId, lead.id), eq(schema.chatConversations.businessId, b.id)));
+  const [chat] = await db
+    .select()
+    .from(schema.chatConversations)
+    .where(and(eq(schema.chatConversations.leadId, lead.id), eq(schema.chatConversations.businessId, b.id), eq(schema.chatConversations.channel, "web")));
+  const [inbox, callLog, threads] = await Promise.all([
+    db.select().from(schema.inboxMessages).where(and(eq(schema.inboxMessages.contactId, c.id), eq(schema.inboxMessages.businessId, b.id))).orderBy(desc(schema.inboxMessages.createdAt)).limit(12),
+    db.select().from(schema.calls).where(and(eq(schema.calls.contactId, c.id), eq(schema.calls.businessId, b.id))).orderBy(desc(schema.calls.createdAt)).limit(10),
+    db.select({ id: schema.chatConversations.id }).from(schema.chatConversations).where(and(eq(schema.chatConversations.contactId, c.id), eq(schema.chatConversations.businessId, b.id), sql`${schema.chatConversations.channel} <> 'web'`)).limit(1),
+  ]);
   const a = lead.attribution;
   const intake = INTAKE_LABELS.filter(([k]) => lead.intake?.[k]);
   const phoneDigits = c.phone?.replace(/[^\d+]/g, "");
@@ -113,6 +121,29 @@ export default async function LeadDetail({ params }: { params: Promise<{ slug: s
           </dl>
         </section>
       </div>
+
+      {(inbox.length > 0 || callLog.length > 0) && (
+        <section className="card">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="card-title mb-0">Texts, emails and calls</div>
+            {threads[0] && <Link className="btn-ghost text-xs" href={`/b/${b.slug}/inbox?c=${threads[0].id}`}>Open in Inbox</Link>}
+          </div>
+          <ul className="divide-y divide-line text-sm">
+            {[
+              ...inbox.map((m) => ({ at: m.createdAt, key: m.id, text: `${m.channel === "sms" ? "Text" : "Email"} ${m.direction === "in" ? "from customer" : m.author === "assistant" ? "from AI assistant" : m.author === "staff" ? "from team" : "(automatic)"}`, body: m.body })),
+              ...callLog.map((k) => ({ at: k.createdAt, key: k.id, text: `Call: ${k.status === "answered" ? "answered" : k.status === "voicemail" ? "voicemail left" : "missed"}`, body: k.recordingUrl ? "Voicemail recorded (play it under Inbox → Calls)" : "" })),
+            ]
+              .sort((x, y) => y.at.getTime() - x.at.getTime())
+              .slice(0, 15)
+              .map((r) => (
+                <li key={r.key} className="py-2">
+                  <div className="flex gap-2 text-xs text-muted"><span className="font-medium text-ink">{r.text}</span><span className="ml-auto">{fmtDateTime(r.at)}</span></div>
+                  {r.body && <p className="mt-0.5 line-clamp-2 whitespace-pre-wrap text-muted">{r.body}</p>}
+                </li>
+              ))}
+          </ul>
+        </section>
+      )}
 
       {chat && (
         <section className="card">

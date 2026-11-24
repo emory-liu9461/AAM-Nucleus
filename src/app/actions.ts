@@ -2,20 +2,24 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db";
 import { dollarsToCents, slugify } from "@/lib/format";
 import { can, requireBusiness, requirePermission } from "@/lib/session";
 import { normalizeDomain } from "@/lib/site-defaults";
-import type { AssistantSettings, SiteContent } from "@/db/schema";
+import type { AssistantSettings, EmailSettings, PhoneSettings, SiteContent } from "@/db/schema";
+import { sendBusinessSms } from "@/lib/sms";
+import { sendBusinessEmail } from "@/lib/email";
+import { toE164 } from "@/lib/twilio";
+import { normalizeSiteUrl, websiteBaseUrl } from "@/lib/app-settings";
 import { isValidTimezone } from "@/lib/availability";
 
 // Every action checks the signed-in user's access first. requireBusiness() 404s
 // if the user isn't assigned to that business; the optional permission argument
 // enforces the role rules in src/lib/session.ts.
 
-const { businesses, contacts, leads, jobs, invoices, payments, scheduleEvents } = schema;
+const { businesses, contacts, leads, jobs, invoices, payments, scheduleEvents, chatConversations, inboxMessages, appSettings } = schema;
 
 const str = (f: FormData, k: string) => {
   const v = f.get(k);
@@ -59,10 +63,16 @@ export async function createBusiness(form: FormData) {
   redirect(`/b/${slug}`);
 }
 
-export async function updateBusiness(slug: string, form: FormData) {
+export async function updateBusiness(slug: string, _: { error?: string; ok?: string } | null, form: FormData) {
   const { business: b } = await requireBusiness(slug, "manage_business");
-  await db.update(businesses).set(bizFromForm(form, b.color)).where(eq(businesses.id, b.id));
+  const parsed = bizSchema.safeParse({
+    name: str(form, "name"), trade: str(form, "trade"), color: str(form, "color") ?? b.color,
+    phone: str(form, "phone"), email: str(form, "email"), website: str(form, "website"),
+  });
+  if (!parsed.success) return { error: "Check the name, trade and color." };
+  await db.update(businesses).set(parsed.data).where(eq(businesses.id, b.id));
   revalidatePath("/", "layout");
+  return { ok: "Saved. Your website shows the new name, phone, email and color within about a minute." };
 }
 
 export async function setBusinessArchived(slug: string, archived: boolean) {
@@ -354,4 +364,135 @@ export async function updateAssistantSettings(slug: string, _: { error?: string;
   await db.update(businesses).set({ assistant }).where(eq(businesses.id, b.id));
   revalidatePath(`/b/${slug}/website`, "layout");
   return { ok: assistant.enabled ? "Saved. The assistant is on." : "Saved. The assistant is off." };
+}
+
+/* ---------- Inbox: texts + email (all roles), phone/email settings (owner) ---------- */
+
+async function inboxConversation(slug: string, conversationId: string) {
+  const ctx = await requireBusiness(slug);
+  const [conv] = await db
+    .select()
+    .from(chatConversations)
+    .where(and(eq(chatConversations.id, conversationId), eq(chatConversations.businessId, ctx.business.id)));
+  if (!conv || conv.channel === "web" || !conv.address) throw new Error("Conversation not found");
+  return { ...ctx, conv };
+}
+
+export async function sendInboxReply(slug: string, conversationId: string, _: { error?: string; ok?: string } | null, form: FormData) {
+  const { business: b, user, conv } = await inboxConversation(slug, conversationId);
+  const body = (str(form, "body") ?? "").slice(0, conv.channel === "sms" ? 1500 : 20000);
+  if (!body) return { error: "Type a message first" };
+  let result;
+  if (conv.channel === "sms") {
+    result = await sendBusinessSms(b, conv.address!, body, { conversationId: conv.id, contactId: conv.contactId, author: "staff", sentById: user.id });
+  } else {
+    const [lastIn] = await db
+      .select()
+      .from(inboxMessages)
+      // Thread onto the customer's latest real email (auto-replies carry no Message-ID we can use).
+      .where(and(eq(inboxMessages.conversationId, conv.id), eq(inboxMessages.direction, "in"), sql`${inboxMessages.externalId} is not null`, sql`${inboxMessages.subject} !~* '^(out of office|automatic reply|auto(matic)?[- ]?reply)'`))
+      .orderBy(desc(inboxMessages.createdAt))
+      .limit(1);
+    const subject = lastIn?.subject ? (/^re:/i.test(lastIn.subject) ? lastIn.subject : `Re: ${lastIn.subject}`) : `Message from ${b.name}`;
+    result = await sendBusinessEmail(b, conv.address!, subject, body, { conversationId: conv.id, contactId: conv.contactId, author: "staff", sentById: user.id, inReplyTo: lastIn?.externalId });
+  }
+  // A person has taken over: the AI stops replying in this conversation.
+  await db.update(chatConversations).set({ aiPaused: true }).where(eq(chatConversations.id, conv.id));
+  revalidatePath(`/b/${slug}/inbox`, "layout");
+  return "error" in result && result.error ? { error: result.error } : { ok: "Sent. The AI is paused for this conversation." };
+}
+
+export async function setConversationAi(slug: string, conversationId: string, paused: boolean) {
+  const { conv } = await inboxConversation(slug, conversationId);
+  await db.update(chatConversations).set({ aiPaused: paused }).where(eq(chatConversations.id, conv.id));
+  revalidatePath(`/b/${slug}/inbox`, "layout");
+}
+
+export async function updatePhoneSettings(slug: string, _: { error?: string; ok?: string } | null, form: FormData) {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  const rawNumber = str(form, "number");
+  const number = rawNumber ? toE164(rawNumber) : null;
+  if (rawNumber && !number) return { error: "Twilio number should look like +15551234567 or (555) 123-4567" };
+  const forwardLines = (str(form, "forwardTo") ?? "").split(/[\n,]+/).map((l) => l.trim()).filter(Boolean);
+  const forwardTo = forwardLines.map(toE164);
+  if (forwardTo.some((n) => !n)) return { error: "Each forwarding number should be a full phone number" };
+  if (number) {
+    const others = await db.select({ id: businesses.id, name: businesses.name }).from(businesses).where(sql`${businesses.phoneSettings}->>'number' = ${number} and ${businesses.id} <> ${b.id}`);
+    if (others.length) return { error: `${number} is already used by ${others[0].name}` };
+    if (forwardTo.includes(number)) return { error: "Don't forward the Twilio number to itself" };
+  }
+  const ring = Number(str(form, "ringSeconds"));
+  const phoneSettings: PhoneSettings = {
+    number: number ?? undefined,
+    forwardTo: forwardTo as string[],
+    ringSeconds: Number.isFinite(ring) ? Math.min(60, Math.max(10, Math.round(ring))) : 20,
+    whisper: form.get("whisper") === "on",
+    voicemail: form.get("voicemail") === "on",
+    missedCallTextBack: form.get("missedCallTextBack") === "on",
+    missedCallMessage: (str(form, "missedCallMessage") ?? "").slice(0, 320) || undefined,
+    smsAssistant: form.get("smsAssistant") === "on",
+  };
+  await db.update(businesses).set({ phoneSettings }).where(eq(businesses.id, b.id));
+  revalidatePath(`/b/${slug}/inbox`, "layout");
+  return { ok: "Phone settings saved" };
+}
+
+export async function updateEmailSettings(slug: string, _: { error?: string; ok?: string } | null, form: FormData) {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  const emailOk = (v: string | null) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  const inboundAddress = str(form, "inboundAddress")?.toLowerCase() ?? null;
+  const fromAddress = str(form, "fromAddress")?.toLowerCase() ?? null;
+  if (!emailOk(inboundAddress) || !emailOk(fromAddress)) return { error: "Enter valid email addresses" };
+  if (inboundAddress) {
+    const others = await db.select({ name: businesses.name }).from(businesses).where(sql`lower(${businesses.emailSettings}->>'inboundAddress') = ${inboundAddress} and ${businesses.id} <> ${b.id}`);
+    if (others.length) return { error: `${inboundAddress} is already used by ${others[0].name}` };
+  }
+  const emailSettings: EmailSettings = {
+    inboundAddress: inboundAddress ?? undefined,
+    fromAddress: fromAddress ?? undefined,
+    fromName: str(form, "fromName") ?? undefined,
+    aiReplies: form.get("aiReplies") === "on",
+    signature: (str(form, "signature") ?? "").slice(0, 600) || undefined,
+  };
+  await db.update(businesses).set({ emailSettings }).where(eq(businesses.id, b.id));
+  revalidatePath(`/b/${slug}/inbox`, "layout");
+  return { ok: "Email settings saved" };
+}
+
+/* ---------- link to the website project (owner) ---------- */
+
+export async function setWebsiteUrl(_: { error?: string; ok?: string } | null, form: FormData) {
+  await requirePermission("manage_business");
+  const raw = str(form, "websiteUrl");
+  const url = normalizeSiteUrl(raw);
+  if (raw && !url) return { error: "Enter the website project's address, e.g. https://aam-nucleus-site.vercel.app" };
+  if (!url) {
+    await db.delete(appSettings).where(eq(appSettings.key, "website_url"));
+  } else {
+    await db
+      .insert(appSettings)
+      .values({ key: "website_url", value: url })
+      .onConflictDoUpdate({ target: appSettings.key, set: { value: url, updatedAt: new Date() } });
+  }
+  revalidatePath("/", "layout");
+  return { ok: url ? `Linked to ${url.replace(/^https?:\/\//, "")}` : "Website link removed" };
+}
+
+/** Checks both directions: the website responds, and it reads this business's content from this Nucleus. */
+export async function testWebsiteLink(slug: string, _: { error?: string; ok?: string } | null) {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  const base = await websiteBaseUrl();
+  if (!base) return { error: "Enter the website project's address first." };
+  try {
+    const res = await fetch(`${base}/?site=${b.slug}`, { cache: "no-store", redirect: "follow", signal: AbortSignal.timeout(10000) });
+    const html = await res.text();
+    if (!res.ok) return { error: `The website answered with an error (${res.status}). Check its latest deployment in Vercel.` };
+    if (html.includes("This website isn") || html.includes("Website preview"))
+      return { error: "The website loads but didn't pick this business. Redeploy the website project, then test again." };
+    if (b.formEnabled && !html.includes(b.formKey))
+      return { error: `The website loads, but it isn't reading from this Nucleus. In Vercel, set NUCLEUS_URL on the website project to this Nucleus address, then redeploy.` };
+    return { ok: `Connected: the website shows ${b.name} and sends its quote requests here.` };
+  } catch {
+    return { error: "Couldn't reach the website. Check the address and that its deployment is Ready in Vercel." };
+  }
 }
