@@ -8,6 +8,9 @@ import { Kpi } from "@/components/Kpi";
 
 const { invoices, payments, contacts, jobs, users, paymentMethod } = schema;
 
+// Canadian wording for payment methods ("ach" is stored for any bank transfer).
+const PAYMENT_LABEL: Record<string, string> = { card: "Card", ach: "Bank transfer / e-Transfer", check: "Cheque", cash: "Cash", financing: "Financing" };
+
 export default async function InvoicesPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ view?: string }> }) {
   const [{ slug }, { view = "open" }] = await Promise.all([params, searchParams]);
   const { business: b } = await requireBusinessPage(slug, "manage_invoices");
@@ -60,7 +63,10 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
             </select>
           </label>
           <label className="field">Description<input className="input" name="description" placeholder="Progress payment #2" /></label>
-          <label className="field">Amount ($)<input className="input" name="amount" inputMode="decimal" required /></label>
+          <label className="field">Amount before tax ($)
+            <input className="input" name="amount" inputMode="decimal" required />
+            <span className="font-normal">{b.taxRate ? `+ ${b.taxLabel || "tax"} ${Number(b.taxRate)}% added` : "No tax set (Settings → Sales tax)"}</span>
+          </label>
           <label className="field">Terms
             <select className="input" name="terms" defaultValue="15">
               <option value="0">Due on receipt</option><option value="15">Net 15</option><option value="30">Net 30</option>
@@ -91,7 +97,10 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
                   <td><div>{first} {last}</div><div className="text-xs text-muted">{job}</div></td>
                   <td className="text-muted">{fmtDate(inv.issuedAt)}</td>
                   <td className={overdue ? "text-bad" : "text-muted"}>{fmtDate(inv.dueAt)}</td>
-                  <td className="text-right">{money(inv.amount)}</td>
+                  <td className="text-right">
+                    {money(inv.amount)}
+                    {inv.taxAmount > 0 && <div className="text-xs text-muted">incl. {inv.taxLabel} {money(inv.taxAmount)}</div>}
+                  </td>
                   <td className="text-right">{inv.status === "void" ? "—" : money(balance)}</td>
                   <td><Badge value={overdue ? "overdue" : inv.status} /></td>
                   <td>
@@ -100,7 +109,7 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
                         <form action={recordPayment.bind(null, b.slug, inv.id)} className="flex items-center gap-1">
                           <input className="input w-24 py-1 text-xs" name="amount" defaultValue={(balance / 100).toFixed(2)} />
                           <select className="input w-auto py-1 text-xs" name="method" defaultValue={inv.amount > 1_000_000 ? "ach" : "card"}>
-                            {paymentMethod.enumValues.map((m) => <option key={m} value={m}>{label(m)}</option>)}
+                            {paymentMethod.enumValues.map((m) => <option key={m} value={m}>{PAYMENT_LABEL[m] ?? label(m)}</option>)}
                           </select>
                           <button className="btn py-1 text-xs">Paid</button>
                         </form>

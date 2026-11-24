@@ -11,8 +11,12 @@ import {
   jsonb,
   primaryKey,
   uniqueIndex,
+  customType,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+
+/** Raw bytes (project photos are stored in the database, no extra file service needed). */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" });
 
 /*
  * Every business-owned table carries businessId. Money is stored as integer cents.
@@ -131,6 +135,13 @@ export const businesses = pgTable("businesses", {
   phoneSettings: jsonb("phone_settings").$type<PhoneSettings>(),
   // Email address customers write to, and automatic AI replies.
   emailSettings: jsonb("email_settings").$type<EmailSettings>(),
+  // Instant alerts to the owner/team (new leads, bookings, voicemails…).
+  alertSettings: jsonb("alert_settings").$type<AlertSettings>(),
+  // Ask happy customers for a review when a job is completed.
+  reviewSettings: jsonb("review_settings").$type<ReviewSettings>(),
+  // Sales tax added to invoices (e.g. "HST", "13").
+  taxLabel: text("tax_label"),
+  taxRate: text("tax_rate"),
 });
 
 export const userBusinesses = pgTable(
@@ -163,6 +174,7 @@ export const contacts = pgTable(
     zip: text("zip"),
     source: leadSource("source").notNull().default("other"),
     smsOptOut: boolean("sms_opt_out").notNull().default(false), // replied STOP
+    marketingConsentAt: timestamp("marketing_consent_at", { withTimezone: true }), // ticked "send me offers" (CASL express consent)
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -236,6 +248,9 @@ export const invoices = pgTable(
     amount: integer("amount").notNull(),
     issuedAt: date("issued_at").notNull(),
     dueAt: date("due_at").notNull(),
+    subtotal: integer("subtotal"), // before tax (null on older invoices: amount had no tax)
+    taxAmount: integer("tax_amount").notNull().default(0),
+    taxLabel: text("tax_label"),
     createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -302,6 +317,7 @@ export type SiteContent = {
 };
 
 export type Intake = {
+  marketingConsent?: string; // "yes" = ticked "send me offers and tips"
   timeline?: string;
   budgetRange?: string;
   propertyType?: string;
@@ -508,6 +524,68 @@ export const socialItems = pgTable(
   },
   (t) => [uniqueIndex("social_items_unique").on(t.businessId, t.channel, t.externalId), index("social_items_recent").on(t.businessId, t.postedAt)],
 );
+
+/** A review request sent to a customer after a completed job. */
+export const reviewRequests = pgTable(
+  "review_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    jobId: uuid("job_id").references(() => jobs.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id")
+      .notNull()
+      .references(() => contacts.id, { onDelete: "cascade" }),
+    token: text("token").notNull().unique(), // used in the tracked review link
+    channels: text("channels").notNull(), // "sms,email"
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+    clickedAt: timestamp("clicked_at", { withTimezone: true }),
+    reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
+  },
+  (t) => [index("review_requests_business_idx").on(t.businessId, t.sentAt), uniqueIndex("review_requests_job").on(t.jobId)],
+);
+
+/** Before/after and finished-project photos shown on the business website. */
+export const projectPhotos = pgTable(
+  "project_photos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    caption: text("caption"),
+    serviceSlug: text("service_slug"),
+    areaSlug: text("area_slug"),
+    kind: text("kind").$type<"before" | "after" | "photo">().notNull().default("photo"),
+    mime: text("mime").notNull(),
+    width: integer("width"),
+    height: integer("height"),
+    bytes: integer("bytes").notNull(),
+    data: bytea("data").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("photos_business_idx").on(t.businessId, t.sortOrder)],
+);
+
+export type AlertSettings = {
+  phones?: string[]; // E.164, get a text for each alert
+  emails?: string[];
+  newLead?: boolean;
+  booking?: boolean;
+  voicemail?: boolean;
+  needsReply?: boolean; // a text/email the AI isn't answering (paused, off or handed off)
+};
+
+export type ReviewSettings = {
+  enabled?: boolean;
+  link?: string; // where to leave a review (Google, HomeStars…)
+  sms?: boolean;
+  email?: boolean;
+  message?: string; // {name}, {business}, {link}
+  reminderDays?: number; // 0 = no reminder
+};
 
 /** App-wide settings editable in Nucleus (e.g. the website project's address). */
 export const appSettings = pgTable("app_settings", {

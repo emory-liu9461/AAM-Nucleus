@@ -18,7 +18,7 @@ const HEARD = ["Google search", "Google Maps", "Facebook / Instagram", "Friend o
 
 const STEPS = ["Your project", "The property", "How to reach you"];
 
-export function IntakeForm({ endpoint, services, defaultService }: { endpoint: string | null; services: string[]; defaultService?: string }) {
+export function IntakeForm({ endpoint, services, defaultService, businessName = "us" }: { endpoint: string | null; services: string[]; defaultService?: string; businessName?: string }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [step, setStep] = useState(0);
@@ -128,6 +128,10 @@ export function IntakeForm({ endpoint, services, defaultService }: { endpoint: s
             {HEARD.map((h) => <option key={h}>{h}</option>)}
           </select>
         </label>
+        <label className="flex items-start gap-2 text-sm font-normal text-muted sm:col-span-2">
+          <input type="checkbox" name="marketing_consent" value="yes" className="mt-1" />
+          <span>Also send me occasional offers and tips from {businessName.replace(/\.+$/, "")}. Unsubscribe anytime.</span>
+        </label>
         <div aria-hidden="true" style={{ position: "absolute", left: "-10000px", width: 1, height: 1, overflow: "hidden" }}>
           <label>Company website<input name="company_website" tabIndex={-1} autoComplete="off" /></label>
         </div>
@@ -140,7 +144,7 @@ export function IntakeForm({ endpoint, services, defaultService }: { endpoint: s
           {step < STEPS.length - 1 ? <>Continue <Icon name="arrow" className="h-4 w-4" /></> : state.pending ? "Sending…" : "Send my request"}
         </button>
       </div>
-      <p className="mt-3 text-center text-xs text-muted">Step {step + 1} of {STEPS.length} · Free, no obligation · We&apos;ll only use your details to respond.</p>
+      <p className="mt-3 text-center text-xs text-muted">Step {step + 1} of {STEPS.length} · Free, no obligation.{step === STEPS.length - 1 ? " By sending this, you agree we can contact you about your request by phone, text or email." : ""}</p>
     </form>
   );
 }

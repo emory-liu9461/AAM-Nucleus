@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { Attribution, Business, Intake } from "@/db/schema";
+import { notify } from "./alerts";
 
 /*
  * Website lead intake, shared by the hosted/embedded form (/f/[key]) and the
@@ -60,6 +61,7 @@ export function normalize(raw: Record<string, unknown>) {
       bestTime: get("best_time", "best_time_to_call").slice(0, 100) || undefined,
       preferredDate: get("preferred_date", "visit_date").slice(0, 50) || undefined,
       heardAbout: get("heard_about", "how_did_you_hear", "referral_source").slice(0, 100) || undefined,
+      marketingConsent: /^(yes|on|true|1)$/i.test(get("marketing_consent")) ? "yes" : undefined,
     } satisfies Intake,
     attribution: {
       utmSource: get("utm_source") || undefined,
@@ -168,6 +170,9 @@ export async function createWebsiteLead(
         .returning()
     )[0];
 
+  // CASL: record express consent to marketing (offers, tips) when they ticked the box.
+  if (data.intake.marketingConsent === "yes") await db.update(contacts).set({ marketingConsentAt: new Date() }).where(eq(contacts.id, contact.id));
+
   const budget = data.budget ? Number(data.budget.replace(/[^0-9.]/g, "")) : budgetFromRange(data.intake.budgetRange);
   const notes = data.message || null;
   const [lead] = await db
@@ -183,6 +188,15 @@ export async function createWebsiteLead(
       intake: Object.keys(intake).length ? intake : null,
     })
     .returning({ id: leads.id });
+  // Chat leads get a booking or handoff alert instead (sent by the assistant).
+  if (meta.channel !== "chat") {
+    const who = `${data.firstName} ${data.lastName}`.trim();
+    await notify(business, "newLead", {
+      title: `New lead: ${who}`,
+      detail: [data.service || "Quote request", data.phone, data.email, `via ${source === "website" ? "website" : source}`].filter(Boolean).join(" · "),
+      path: `/b/${business.slug}/leads/${lead.id}`,
+    });
+  }
   return { ok: true, leadId: lead.id };
 }
 

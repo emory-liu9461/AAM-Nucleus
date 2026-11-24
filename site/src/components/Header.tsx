@@ -5,6 +5,7 @@ import { Icon } from "./Icon";
 
 const NAV = [
   ["/services", "Services"],
+  ["/projects", "Projects"],
   ["/areas", "Service areas"],
   ["/reviews", "Reviews"],
   ["/about", "About"],
@@ -12,7 +13,7 @@ const NAV = [
 
 export function Header({ site }: { site: Site }) {
   const { business: b, content: c } = site;
-  const nav = NAV.filter(([href]) => (href === "/areas" ? c.serviceAreas.length > 0 : href === "/reviews" ? c.reviews.length > 0 : true));
+  const nav = NAV.filter(([href]) => (href === "/areas" ? c.serviceAreas.length > 0 : href === "/reviews" ? c.reviews.length > 0 : href === "/projects" ? (site.photos?.length ?? 0) > 0 : true));
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-white/95 backdrop-blur">
       <div className="wrap flex h-16 items-center gap-6">

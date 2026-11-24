@@ -23,7 +23,7 @@ export default async function Quote({ params, searchParams }: Props) {
       <section className="py-14">
         <div className="wrap grid gap-10 lg:grid-cols-[1fr_340px]">
           <div className="rounded-2xl border border-line bg-white p-6 shadow-xl shadow-slate-900/5 sm:p-8">
-            <IntakeForm endpoint={endpointFor(s)} services={s.content.services.map((x) => x.name)} defaultService={svc} />
+            <IntakeForm businessName={s.business.name} endpoint={endpointFor(s)} services={s.content.services.map((x) => x.name)} defaultService={svc} />
           </div>
           <aside className="space-y-4">
             {b.phone && (

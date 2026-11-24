@@ -37,7 +37,7 @@ export function Hero({ site }: { site: Site }) {
           </ul>
         </div>
         <div className="rounded-2xl border border-line bg-white p-6 shadow-xl shadow-slate-900/5" id="quote">
-          <QuoteForm endpoint={endpointFor(site)} services={c.services.map((s) => s.name)} compact heading="Request your free quote" />
+          <QuoteForm businessName={site.business.name} endpoint={endpointFor(site)} services={c.services.map((s) => s.name)} compact heading="Request your free quote" />
         </div>
       </div>
     </section>

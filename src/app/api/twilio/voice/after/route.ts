@@ -2,7 +2,8 @@ import { after } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { businessByTwilioNumber, missedCallTextBack, phoneSettings } from "@/lib/sms";
-import { readTwilioWebhook, twiml, xml } from "@/lib/twilio";
+import { prettyPhone, readTwilioWebhook, twiml, xml } from "@/lib/twilio";
+import { notify } from "@/lib/alerts";
 
 /** Runs when the forwarded call ends: answered -> done; otherwise voicemail + text-back. */
 export async function POST(req: Request) {
@@ -32,7 +33,10 @@ export async function POST(req: Request) {
 
   const p = phoneSettings(b);
   const textNote = p.missedCallTextBack ? " We'll also send you a text so you can reply there." : "";
-  if (!p.voicemail) return twiml(`<Say>Sorry, we can't take your call right now.${xml(textNote)} Goodbye.</Say><Hangup/>`);
+  if (!p.voicemail) {
+    after(() => notify(b, "voicemail", { title: `Missed call from ${prettyPhone(From)}`, path: `/b/${b.slug}/inbox/calls` }));
+    return twiml(`<Say>Sorry, we can't take your call right now.${xml(textNote)} Goodbye.</Say><Hangup/>`);
+  }
   return twiml(
     `<Say>Thanks for calling ${xml(b.name.replace(/\.+$/, ""))}. Sorry we missed you. Please leave a message after the tone.${xml(textNote)}</Say>` +
       `<Record maxLength="120" playBeep="true" timeout="5" action="${xml(`${hook.base}/api/twilio/voice/voicemail`)}" method="POST"/>` +

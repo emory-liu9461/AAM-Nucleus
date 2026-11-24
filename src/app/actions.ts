@@ -8,7 +8,9 @@ import { db, schema } from "@/db";
 import { dollarsToCents, slugify } from "@/lib/format";
 import { can, requireBusiness, requirePermission } from "@/lib/session";
 import { normalizeDomain } from "@/lib/site-defaults";
-import type { AssistantSettings, EmailSettings, PhoneSettings, SiteContent } from "@/db/schema";
+import type { AlertSettings, AssistantSettings, EmailSettings, PhoneSettings, ReviewSettings, SiteContent } from "@/db/schema";
+import { alertSettings, notify } from "@/lib/alerts";
+import { reviewSettings, sendReviewRequest } from "@/lib/reviews";
 import { sendBusinessSms } from "@/lib/sms";
 import { sendBusinessEmail } from "@/lib/email";
 import { toE164 } from "@/lib/twilio";
@@ -161,10 +163,16 @@ export async function updateJob(slug: string, jobId: string, form: FormData) {
         actualCost: dollarsToCents(form.get("actualCost")),
       }
     : {};
+  const [before] = await db.select({ status: jobs.status }).from(jobs).where(and(eq(jobs.id, jobId), eq(jobs.businessId, b.id)));
   await db
     .update(jobs)
     .set({ ...dates, ...money })
     .where(and(eq(jobs.id, jobId), eq(jobs.businessId, b.id)));
+  // Just finished: ask the customer for a review (if turned on in Settings).
+  if (status === "completed" && before?.status !== "completed" && reviewSettings(b).enabled) {
+    const r = await sendReviewRequest(b, jobId);
+    if ("error" in r && r.error && !r.error.startsWith("A review request was already")) console.error("review request:", r.error);
+  }
   revalidatePath(`/b/${slug}`, "layout");
   revalidatePath("/");
 }
@@ -186,7 +194,8 @@ export async function createInvoice(slug: string, form: FormData) {
     jobId: job.id,
     number: `${prefix}-${2000 + Number(count)}`,
     description: str(form, "description"),
-    amount: dollarsToCents(form.get("amount")),
+    // The amount typed in is before tax; the business's tax rate (Settings → Sales tax) is added on top.
+    ...withTax(dollarsToCents(form.get("amount")), b),
     status: "sent",
     issuedAt: issued.toISOString().slice(0, 10),
     dueAt: due.toISOString().slice(0, 10),
@@ -194,6 +203,12 @@ export async function createInvoice(slug: string, form: FormData) {
   });
   revalidatePath(`/b/${slug}`, "layout");
   revalidatePath("/");
+}
+
+function withTax(subtotal: number, b: { taxRate: string | null; taxLabel: string | null }) {
+  const rate = Number(b.taxRate ?? 0);
+  const taxAmount = rate > 0 ? Math.round((subtotal * rate) / 100) : 0;
+  return { subtotal, taxAmount, taxLabel: rate > 0 ? `${b.taxLabel || "Tax"} ${rate}%` : null, amount: subtotal + taxAmount };
 }
 
 export async function recordPayment(slug: string, invoiceId: string, form: FormData) {
@@ -591,4 +606,98 @@ export async function saveManualStats(slug: string, _: { error?: string; ok?: st
   await saveStats(b.id, channel, vals, "manual");
   revalidatePath(`/b/${slug}/social`, "layout");
   return { ok: `Saved today's numbers for ${SOCIAL_CHANNELS.find((c) => c.key === channel)!.name}.` };
+}
+
+/* ---------- alerts, review requests, sales tax (owner) ---------- */
+
+const lines = (form: FormData, k: string) => (str(form, k) ?? "").split(/[\n,;]+/).map((l) => l.trim()).filter(Boolean);
+
+export async function updateAlertSettings(slug: string, _: { error?: string; ok?: string } | null, form: FormData) {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  const phones = lines(form, "phones").map(toE164);
+  if (phones.some((p) => !p)) return { error: "Each phone should be a full number, e.g. (613) 555-0199" };
+  const emails = lines(form, "emails").map((e) => e.toLowerCase());
+  if (emails.some((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))) return { error: "Check the email addresses" };
+  const alertSettings: AlertSettings = {
+    phones: phones as string[], emails,
+    newLead: form.get("newLead") === "on", booking: form.get("booking") === "on",
+    voicemail: form.get("voicemail") === "on", needsReply: form.get("needsReply") === "on",
+  };
+  await db.update(businesses).set({ alertSettings }).where(eq(businesses.id, b.id));
+  revalidatePath(`/b/${slug}/settings`);
+  return { ok: "Alert settings saved" };
+}
+
+export async function sendTestAlert(slug: string, _: { error?: string; ok?: string } | null) {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  const s = await alertSettings(b);
+  if (!s.phones.length && !s.emails.length) return { error: "Add a phone or email first" };
+  const r = await notify(b, "newLead", { title: "Test alert from Nucleus", detail: "If you got this, alerts are working.", path: `/b/${b.slug}/settings` });
+  return r.sent ? { ok: `Sent ${r.sent} test alert${r.sent === 1 ? "" : "s"}. Check your phone and inbox.` } : { error: "Nothing was sent. Texts need Twilio and this business's number set up (Inbox → Settings); emails need Postmark and a business email." };
+}
+
+export async function updateReviewSettings(slug: string, _: { error?: string; ok?: string } | null, form: FormData) {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  const link = str(form, "link");
+  if (link && !/^https:\/\/\S+\.\S+/.test(link)) return { error: "The review link should start with https://" };
+  const enabled = form.get("enabled") === "on";
+  if (enabled && !link) return { error: "Add your review link to turn review requests on" };
+  const days = Number(str(form, "reminderDays") ?? "3");
+  const reviewSettings: ReviewSettings = {
+    enabled, link: link ?? undefined, sms: form.get("sms") === "on", email: form.get("email") === "on",
+    message: (str(form, "message") ?? "").slice(0, 400) || undefined,
+    reminderDays: Number.isFinite(days) ? Math.min(30, Math.max(0, Math.round(days))) : 3,
+  };
+  await db.update(businesses).set({ reviewSettings }).where(eq(businesses.id, b.id));
+  revalidatePath(`/b/${slug}`, "layout");
+  return { ok: enabled ? "Review requests are on" : "Review requests are off" };
+}
+
+export async function updateTaxSettings(slug: string, _: { error?: string; ok?: string } | null, form: FormData) {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  const preset = str(form, "preset");
+  let label = str(form, "taxLabel");
+  let rate = str(form, "taxRate");
+  if (preset && preset !== "custom") [label, rate] = preset.split("|");
+  const r = rate === null ? null : Number(rate);
+  if (r !== null && (!Number.isFinite(r) || r < 0 || r > 30)) return { error: "Tax rate should be a percentage between 0 and 30" };
+  await db.update(businesses).set({ taxLabel: label || null, taxRate: r === null || r === 0 ? null : String(r) }).where(eq(businesses.id, b.id));
+  revalidatePath(`/b/${slug}`, "layout");
+  return { ok: r ? `New invoices will add ${label || "tax"} at ${r}%` : "No tax will be added to new invoices" };
+}
+
+export async function sendReviewRequestNow(slug: string, jobId: string, _: { error?: string; ok?: string } | null) {
+  const { business: b } = await requireBusiness(slug);
+  const r = await sendReviewRequest(b, jobId, { force: true });
+  revalidatePath(`/b/${slug}/jobs`);
+  return "error" in r && r.error ? { error: r.error } : { ok: `Review request sent by ${(r as { channels: string[] }).channels.join(" and ").replace("sms", "text")}.` };
+}
+
+/* ---------- project photos (owner) ---------- */
+
+export async function updatePhoto(slug: string, id: string, form: FormData) {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  const kind = ["before", "after", "photo"].includes(str(form, "kind") ?? "") ? (str(form, "kind") as "before" | "after" | "photo") : "photo";
+  await db
+    .update(schema.projectPhotos)
+    .set({ caption: (str(form, "caption") ?? "").slice(0, 200) || null, serviceSlug: str(form, "service"), areaSlug: str(form, "area"), kind })
+    .where(and(eq(schema.projectPhotos.id, id), eq(schema.projectPhotos.businessId, b.id)));
+  revalidatePath(`/b/${slug}/social/photos`);
+}
+
+export async function movePhoto(slug: string, id: string, direction: "up" | "down") {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  const list = await db.select({ id: schema.projectPhotos.id }).from(schema.projectPhotos).where(eq(schema.projectPhotos.businessId, b.id)).orderBy(desc(schema.projectPhotos.sortOrder));
+  const i = list.findIndex((p) => p.id === id);
+  const j = direction === "up" ? i - 1 : i + 1;
+  if (i < 0 || j < 0 || j >= list.length) return;
+  [list[i], list[j]] = [list[j], list[i]];
+  for (const [k, p] of list.entries()) await db.update(schema.projectPhotos).set({ sortOrder: list.length - k }).where(eq(schema.projectPhotos.id, p.id));
+  revalidatePath(`/b/${slug}/social/photos`);
+}
+
+export async function deletePhoto(slug: string, id: string) {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  await db.delete(schema.projectPhotos).where(and(eq(schema.projectPhotos.id, id), eq(schema.projectPhotos.businessId, b.id)));
+  revalidatePath(`/b/${slug}/social/photos`);
 }

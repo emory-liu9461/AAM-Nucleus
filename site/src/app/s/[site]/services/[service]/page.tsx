@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { QuoteForm } from "@/components/QuoteForm";
+import { ProjectGrid } from "@/components/Projects";
 import { CtaBand, PageHero, Reviews, endpointFor, trustPoints } from "@/components/Sections";
 import { getSite } from "@/lib/site";
 
@@ -49,6 +50,9 @@ export default async function ServicePage({ params }: Props) {
                 </li>
               ))}
             </ul>
+            {(s.photos ?? []).some((p) => p.service === svc.slug) && (
+              <><h2 className="mt-10 text-xl font-bold">{svc.name} projects</h2><div className="mt-4"><ProjectGrid site={s} photos={(s.photos ?? []).filter((p) => p.service === svc.slug)} limit={6} /></div></>
+            )}
             {c.reviews.length > 0 && (<><h2 className="mt-10 text-xl font-bold">Customer reviews</h2><div className="mt-4"><Reviews site={s} limit={2} /></div></>)}
             <h2 className="mt-10 text-xl font-bold">Other services</h2>
             <ul className="mt-3 flex flex-wrap gap-2">
@@ -58,7 +62,7 @@ export default async function ServicePage({ params }: Props) {
             </ul>
           </div>
           <aside className="h-fit rounded-2xl border border-line bg-white p-6 shadow-xl shadow-slate-900/5 lg:sticky lg:top-24">
-            <QuoteForm endpoint={endpointFor(s)} services={c.services.map((x) => x.name)} defaultService={svc.name} compact heading={`Get a ${svc.name.toLowerCase()} quote`} />
+            <QuoteForm businessName={s.business.name} endpoint={endpointFor(s)} services={c.services.map((x) => x.name)} defaultService={svc.name} compact heading={`Get a ${svc.name.toLowerCase()} quote`} />
           </aside>
         </div>
       </section>

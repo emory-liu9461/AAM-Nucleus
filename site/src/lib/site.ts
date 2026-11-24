@@ -9,6 +9,8 @@ import { notFound } from "next/navigation";
  * Responses are cached for 60 seconds, so edits in Nucleus show up within a minute.
  */
 
+export type Photo = { id: string; caption: string | null; kind: "before" | "after" | "photo"; service: string | null; area: string | null; width: number | null; height: number | null };
+
 export type Site = {
   business: {
     name: string;
@@ -39,7 +41,10 @@ export type Site = {
     social: Record<string, string>; // channel key -> profile URL (google, facebook, instagram, tiktok, …)
     analytics: { ga4?: string; googleAds?: string; metaPixel?: string };
   };
+  photos?: Photo[];
 };
+
+export const photoUrl = (id: string) => `${nucleusUrl()}/api/public/photos/${id}`;
 
 export const nucleusUrl = () => (process.env.NUCLEUS_URL ?? "http://localhost:3000").replace(/\/$/, "");
 

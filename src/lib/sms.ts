@@ -4,6 +4,7 @@ import { db, schema } from "@/db";
 import type { Business, ChatConversation, Contact, PhoneSettings } from "@/db/schema";
 import { assistantConfigured, chatTurn } from "./assistant";
 import { OPT_IN, OPT_OUT, prettyPhone, sendTwilioSms, toE164, twilioConfigured } from "./twilio";
+import { notify } from "./alerts";
 
 /*
  * Text messaging and missed-call handling for each business's Twilio number.
@@ -66,12 +67,12 @@ export async function leadForContact(b: Business, contact: Contact, title: "Text
     .where(and(eq(leads.contactId, contact.id), eq(leads.businessId, b.id), gte(leads.createdAt, since), sql`${leads.stage} not in ('won','lost')`))
     .orderBy(desc(leads.createdAt))
     .limit(1);
-  if (open) return open.id;
+  if (open) return { id: open.id, created: false };
   const [l] = await db
     .insert(leads)
     .values({ businessId: b.id, contactId: contact.id, title, source: contact.source === "phone" ? "phone" : contact.source, attribution: { channel: "chat", formName: title === "Missed call" ? "phone-call" : "sms" } })
     .returning({ id: leads.id });
-  return l.id;
+  return { id: l.id, created: true };
 }
 
 /** The ongoing text conversation with this number, or a new one. */
@@ -140,7 +141,8 @@ export async function sendBusinessSms(
 export async function handleInboundSms(b: Business, from: string, body: string, sid: string | null) {
   const phone = toE164(from) ?? from;
   const contact = await contactForPhone(b, phone);
-  const leadId = await leadForContact(b, contact, "Text message");
+  const lead = await leadForContact(b, contact, "Text message");
+  const leadId = lead.id;
   const conv = await smsConversation(b, phone, contact, leadId);
   const p = phoneSettings(b);
   await db.insert(inboxMessages).values({
@@ -159,7 +161,14 @@ export async function handleInboundSms(b: Business, from: string, body: string, 
     return { replied: false, reason: "opted-in" };
   }
   if (contact.smsOptOut) return { replied: false, reason: "opted-out" };
-  if (!p.smsAssistant || conv.aiPaused || !assistantConfigured()) return { replied: false, reason: "ai-off" };
+  const who = /^[+(\d]/.test(contact.firstName) ? prettyPhone(phone) : `${contact.firstName} ${contact.lastName}`.trim();
+  const aiOff = !p.smsAssistant || conv.aiPaused || !assistantConfigured();
+  if (lead.created) {
+    await notify(b, "newLead", { title: `New text from ${who}`, detail: `"${body.slice(0, 120)}"${aiOff ? "" : " · the AI is replying"}`, path: `/b/${b.slug}/inbox?c=${conv.id}` });
+  } else if (aiOff && !(await alertedRecently(conv.id))) {
+    await notify(b, "needsReply", { title: `Text from ${who} needs a reply`, detail: `"${body.slice(0, 120)}"`, path: `/b/${b.slug}/inbox?c=${conv.id}` });
+  }
+  if (aiOff) return { replied: false, reason: "ai-off" };
 
   // One AI turn at a time per conversation, using the latest history.
   return db.transaction(async (tx) => {
@@ -172,6 +181,15 @@ export async function handleInboundSms(b: Business, from: string, body: string, 
     const sent = await sendBusinessSms(b, phone, turn.reply, { conversationId: conv.id, contactId: contact.id, author: "assistant" });
     return { replied: !("error" in sent && sent.error), reason: "ai" };
   });
+}
+
+/** Only one "needs a reply" alert per conversation every 30 minutes, however many texts arrive. */
+export async function alertedRecently(conversationId: string) {
+  const [r] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(inboxMessages)
+    .where(and(eq(inboxMessages.conversationId, conversationId), eq(inboxMessages.direction, "in"), gte(inboxMessages.createdAt, new Date(Date.now() - 30 * 60e3))));
+  return Number(r?.n ?? 0) > 1; // the message just received counts as one
 }
 
 /** After a missed call: text the caller so the conversation can continue by SMS. */
@@ -188,7 +206,7 @@ export async function missedCallTextBack(b: Business, from: string) {
     .where(and(eq(inboxMessages.businessId, b.id), eq(inboxMessages.toAddr, phone), eq(inboxMessages.author, "system"), eq(inboxMessages.channel, "sms"), gte(inboxMessages.createdAt, new Date(Date.now() - 10 * 60e3))))
     .limit(1);
   if (recent.length) return false;
-  const leadId = await leadForContact(b, contact, "Missed call");
+  const { id: leadId } = await leadForContact(b, contact, "Missed call");
   const conv = await smsConversation(b, phone, contact, leadId);
   // "Sample Painting Co." + "." should read "Co." not "Co.."
   const text = p.missedCallMessage.replace(/\{business\}\./g, `${b.name.replace(/\.+$/, "")}.`).replace(/\{business\}/g, b.name);

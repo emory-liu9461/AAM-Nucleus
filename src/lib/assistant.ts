@@ -5,6 +5,7 @@ import type { Business, ChatConversation } from "@/db/schema";
 import { availableSlots, bookingSettings, isValidTimezone, slotIsOpen, slotLabel } from "./availability";
 import { createWebsiteLead, normalize } from "./intake";
 import { publicSite } from "./site-defaults";
+import { notify } from "./alerts";
 
 /*
  * Website AI assistant: answers customer questions from the business's own content
@@ -229,6 +230,11 @@ async function runTool(b: Business, state: TurnState, name: string, input: Recor
     if (result.taken) return { content: "That time was just taken or is no longer available. Call get_available_times again and offer new options.", isError: true };
     const label = slotLabel(start, tz);
     state.booking = { label, kind };
+    await notify(b, "booking", {
+      title: `${kind === "site_visit" ? "Site visit" : "Call"} booked: ${str("name")}`,
+      detail: [label, str("service"), str("phone"), kind === "site_visit" ? str("address") : ""].filter(Boolean).join(" · "),
+      path: result.leadId ? `/b/${b.slug}/leads/${result.leadId}` : `/b/${b.slug}/schedule`,
+    });
     await db.update(schema.chatConversations).set({ status: "booked", eventId: result.eventId, leadId: result.leadId ?? state.conv.leadId }).where(eq(schema.chatConversations.id, state.conv.id));
     return { content: JSON.stringify({ booked: true, appointment_type: kind, when: label, time_zone: tz }) };
   }
@@ -238,6 +244,11 @@ async function runTool(b: Business, state: TurnState, name: string, input: Recor
       ? await ensureLead(b, state.conv, { name: str("name") || "Website visitor", phone: str("phone"), email: str("email"), address: "", service: "Chat follow-up", message: `${str("reason")}: ${str("summary")}`, timeline: "", budget: "" }, ip)
       : null;
     state.handedOff = true;
+    await notify(b, "needsReply", {
+      title: `Customer needs a person: ${str("name") || "website visitor"}`,
+      detail: [str("reason"), str("summary"), str("phone"), str("email")].filter(Boolean).join(" · "),
+      path: leadId ? `/b/${b.slug}/leads/${leadId}` : `/b/${b.slug}/social/assistant`,
+    });
     await db
       .update(schema.chatConversations)
       .set({ status: state.conv.status === "booked" ? "booked" : "handoff", summary: `${str("reason")}: ${str("summary")}`, leadId: leadId ?? state.conv.leadId })

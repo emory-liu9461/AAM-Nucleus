@@ -21,6 +21,7 @@ const INTAKE_LABELS: [keyof NonNullable<typeof leads.$inferSelect.intake>, strin
   ["bestTime", "Best time"],
   ["preferredDate", "Preferred site visit"],
   ["heardAbout", "Heard about us"],
+  ["marketingConsent", "OK to send offers (CASL)"],
 ];
 
 export default async function LeadDetail({ params }: { params: Promise<{ slug: string; id: string }> }) {

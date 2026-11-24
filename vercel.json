@@ -3,8 +3,8 @@
   "ignoreCommand": "bash -c 'if [ -z \"$VERCEL_GIT_PREVIOUS_SHA\" ]; then exit 1; fi; git diff --quiet \"$VERCEL_GIT_PREVIOUS_SHA\" HEAD -- . \":(exclude)site\"'",
   "crons": [
     {
-      "path": "/api/cron/social-sync",
-      "schedule": "17 9 * * *"
+      "path": "/api/cron/daily",
+      "schedule": "17 15 * * *"
     }
   ]
 }

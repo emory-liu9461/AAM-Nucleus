@@ -1,7 +1,11 @@
+// Canadian dollars by default (set CURRENCY=USD to switch). en-CA shows CAD as plain "$".
+const CURRENCY = process.env.CURRENCY ?? process.env.NEXT_PUBLIC_CURRENCY ?? "CAD";
+const LOCALE = CURRENCY === "CAD" ? "en-CA" : "en-US";
+
 export const money = (cents: number, compact = false) =>
-  new Intl.NumberFormat("en-US", {
+  new Intl.NumberFormat(LOCALE, {
     style: "currency",
-    currency: "USD",
+    currency: CURRENCY,
     maximumFractionDigits: compact || Math.abs(cents) >= 100000 ? 0 : 2,
     notation: compact ? "compact" : "standard",
   }).format(cents / 100);

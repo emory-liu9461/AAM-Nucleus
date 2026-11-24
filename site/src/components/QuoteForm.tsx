@@ -8,8 +8,9 @@ import { useRouter } from "next/navigation";
  * visitor's landing page (saved by <TrackAttribution/>) are sent with the lead.
  */
 export function QuoteForm({
-  endpoint, services, defaultService, compact = false, heading,
+  endpoint, services, defaultService, compact = false, heading, businessName = "us",
 }: {
+  businessName?: string;
   endpoint: string | null;
   services: string[];
   defaultService?: string;
@@ -57,6 +58,10 @@ export function QuoteForm({
       <label className="field sm:col-span-2">Project details{compact ? " (optional)" : ""}
         <textarea className="input" name="message" rows={compact ? 2 : 4} placeholder="What do you need done, and when?" />
       </label>
+      <label className="flex items-start gap-2 text-sm font-normal text-muted sm:col-span-2">
+        <input type="checkbox" name="marketing_consent" value="yes" className="mt-1" />
+        <span>Also send me occasional offers and tips from {businessName.replace(/\.+$/, "")}. Unsubscribe anytime.</span>
+      </label>
       <div aria-hidden="true" style={{ position: "absolute", left: "-10000px", width: 1, height: 1, overflow: "hidden" }}>
         <label>Company website<input name="company_website" tabIndex={-1} autoComplete="off" /></label>
       </div>
@@ -64,7 +69,7 @@ export function QuoteForm({
         {state.error && <p className="mb-2 text-sm font-medium text-red-700" role="alert">{state.error}</p>}
         <button className="btn-primary w-full text-base" disabled={state.pending}>{state.pending ? "Sending…" : "Get my free quote"}</button>
         <p className="mt-2 text-center text-xs text-muted">
-          No obligation. We usually reply within one business day.{compact && <> Bigger project? <a href="/quote" className="font-semibold text-brand hover:underline">Use the detailed form</a>.</>}
+          No obligation. By sending this, you agree we can contact you about your request by phone, text or email.{compact && <> Bigger project? <a href="/quote" className="font-semibold text-brand hover:underline">Use the detailed form</a>.</>}
         </p>
       </div>
     </form>

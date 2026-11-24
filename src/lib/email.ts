@@ -3,6 +3,8 @@ import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { Business, ChatConversation, Contact } from "@/db/schema";
 import { assistantConfigured, chatTurn } from "./assistant";
+import { notify } from "./alerts";
+import { alertedRecently } from "./sms";
 
 /*
  * Email for each business through Postmark: incoming mail arrives on the inbound
@@ -65,12 +67,12 @@ async function leadForEmail(b: Business, contact: Contact, subject: string) {
     .where(and(eq(leads.contactId, contact.id), eq(leads.businessId, b.id), gte(leads.createdAt, since), sql`${leads.stage} not in ('won','lost')`))
     .orderBy(desc(leads.createdAt))
     .limit(1);
-  if (open) return open.id;
+  if (open) return { id: open.id, created: false };
   const [l] = await db
     .insert(leads)
     .values({ businessId: b.id, contactId: contact.id, title: "Email", source: contact.source, notes: subject ? `Subject: ${subject}` : null, attribution: { channel: "chat", formName: "email" } })
     .returning({ id: leads.id });
-  return l.id;
+  return { id: l.id, created: true };
 }
 
 async function emailConversation(b: Business, email: string, contact: Contact, leadId: string): Promise<ChatConversation> {
@@ -89,6 +91,20 @@ async function emailConversation(b: Business, email: string, contact: Contact, l
   return c;
 }
 
+/** Low-level send through Postmark. Returns the Message-ID header value. */
+export async function postmarkSend(m: { from: string; to: string; replyTo?: string | null; subject: string; text: string; headers?: { Name: string; Value: string }[] }) {
+  const api = (process.env.POSTMARK_API_BASE ?? "https://api.postmarkapp.com").replace(/\/$/, "");
+  const res = await fetch(`${api}/email`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json", "X-Postmark-Server-Token": process.env.POSTMARK_SERVER_TOKEN ?? "" },
+    body: JSON.stringify({ From: m.from, To: m.to, ReplyTo: m.replyTo ?? undefined, Subject: m.subject.slice(0, 200), TextBody: m.text, Headers: m.headers ?? [], MessageStream: "outbound" }),
+    signal: AbortSignal.timeout(15000),
+  });
+  const json = (await res.json().catch(() => ({}))) as { MessageID?: string; ErrorCode?: number; Message?: string };
+  if (!res.ok || json.ErrorCode) throw new Error(`Postmark ${res.status} (${json.ErrorCode ?? "?"}): ${json.Message ?? "send failed"}`);
+  return json.MessageID ? `<${json.MessageID}@mtasv.net>` : null;
+}
+
 /** Send an email from the business and log it in the Inbox. */
 export async function sendBusinessEmail(
   b: Business,
@@ -105,27 +121,11 @@ export async function sendBusinessEmail(
     ...(opts.inReplyTo ? [{ Name: "In-Reply-To", Value: opts.inReplyTo }, { Name: "References", Value: opts.inReplyTo }] : []),
     ...(opts.automated ? [{ Name: "Auto-Submitted", Value: "auto-replied" }] : []),
   ];
-  const api = (process.env.POSTMARK_API_BASE ?? "https://api.postmarkapp.com").replace(/\/$/, "");
   let externalId: string | null = null;
   let status = "sent";
   let error: string | undefined;
   try {
-    const res = await fetch(`${api}/email`, {
-      method: "POST",
-      headers: { Accept: "application/json", "Content-Type": "application/json", "X-Postmark-Server-Token": process.env.POSTMARK_SERVER_TOKEN! },
-      body: JSON.stringify({
-        From: `"${s.fromName.replace(/"/g, "")}" <${s.fromAddress}>`,
-        To: to,
-        ReplyTo: s.inboundAddress ?? s.fromAddress,
-        Subject: subject.slice(0, 200),
-        TextBody: text,
-        Headers: headers,
-        MessageStream: "outbound",
-      }),
-    });
-    const json = (await res.json().catch(() => ({}))) as { MessageID?: string; ErrorCode?: number; Message?: string };
-    if (!res.ok || json.ErrorCode) throw new Error(`Postmark ${res.status} (${json.ErrorCode ?? "?"}): ${json.Message ?? "send failed"}`);
-    externalId = json.MessageID ? `<${json.MessageID}@mtasv.net>` : null;
+    externalId = await postmarkSend({ from: `"${s.fromName.replace(/"/g, "")}" <${s.fromAddress}>`, to, replyTo: s.inboundAddress ?? s.fromAddress, subject, text, headers });
   } catch (e) {
     status = "failed";
     error = e instanceof Error ? e.message : "send failed";
@@ -182,8 +182,8 @@ export async function handleInboundEmail(b: Business, p: InboundEmail) {
   const subject = (p.Subject ?? "").trim().slice(0, 200);
   const body = (p.StrippedTextReply?.trim() || p.TextBody?.trim() || "").slice(0, 8000);
   const contact = await contactForEmail(b, from, p.FromFull?.Name ?? p.FromName ?? "");
-  const leadId = await leadForEmail(b, contact, subject);
-  const conv = await emailConversation(b, from, contact, leadId);
+  const lead = await leadForEmail(b, contact, subject);
+  const conv = await emailConversation(b, from, contact, lead.id);
   const messageId = header(p, "Message-ID") || null;
   await db.insert(inboxMessages).values({
     channel: "email", businessId: b.id, conversationId: conv.id, contactId: contact.id, direction: "in", author: "customer",
@@ -193,7 +193,14 @@ export async function handleInboundEmail(b: Business, p: InboundEmail) {
 
   if (isAutomatedEmail(p, from, [s.inboundAddress, s.fromAddress])) return { replied: false, reason: "automated" };
   if (!body) return { replied: false, reason: "empty" };
-  if (!s.aiReplies || conv.aiPaused || !assistantConfigured()) return { replied: false, reason: "ai-off" };
+  const aiOff = !s.aiReplies || conv.aiPaused || !assistantConfigured();
+  const who = `${contact.firstName} ${contact.lastName}`.trim() || from;
+  if (lead.created) {
+    await notify(b, "newLead", { title: `New email from ${who}`, detail: `${subject || "(no subject)"}${aiOff ? "" : " · the AI is replying"}`, path: `/b/${b.slug}/inbox?c=${conv.id}` });
+  } else if (aiOff && !(await alertedRecently(conv.id))) {
+    await notify(b, "needsReply", { title: `Email from ${who} needs a reply`, detail: subject || undefined, path: `/b/${b.slug}/inbox?c=${conv.id}` });
+  }
+  if (aiOff) return { replied: false, reason: "ai-off" };
 
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${conv.id}))`);

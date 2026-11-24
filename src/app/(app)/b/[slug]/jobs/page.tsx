@@ -1,8 +1,9 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { updateJob } from "@/app/actions";
+import { sendReviewRequestNow, updateJob } from "@/app/actions";
+import { ActionForm } from "@/components/ActionForm";
 import { can, requireBusinessPage } from "@/lib/session";
-import { label, money as fmtMoney, pct } from "@/lib/format";
+import { fmtDate, label, money as fmtMoney, pct } from "@/lib/format";
 import { Badge } from "@/components/Badge";
 
 const { jobs, contacts, invoices, payments, jobStatus } = schema;
@@ -19,6 +20,7 @@ export default async function JobsPage({ params, searchParams }: { params: Promi
       last: contacts.lastName,
       invoiced: sql<number>`(select coalesce(sum(amount),0) from ${invoices} where ${invoices.jobId} = ${jobs.id} and status <> 'void')`,
       paid: sql<number>`(select coalesce(sum(p.amount),0) from ${payments} p join ${invoices} i on i.id = p.invoice_id where i.job_id = ${jobs.id})`,
+      review: sql<{ sent: string; clicked: string | null } | null>`(select json_build_object('sent', r.sent_at, 'clicked', r.clicked_at) from review_requests r where r.job_id = ${jobs.id})`,
     })
     .from(jobs)
     .innerJoin(contacts, eq(contacts.id, jobs.contactId))
@@ -35,7 +37,7 @@ export default async function JobsPage({ params, searchParams }: { params: Promi
       </div>
       <div className="space-y-3">
         {rows.length === 0 && <div className="card text-center text-sm text-muted">No jobs here. Jobs are created when a lead is marked Won.</div>}
-        {rows.map(({ job, first, last, invoiced, paid }) => {
+        {rows.map(({ job, first, last, invoiced, paid, review }) => {
           const cost = job.actualCost || job.estimatedCost;
           const margin = job.contractValue ? (job.contractValue - cost) / job.contractValue : null;
           return (
@@ -65,6 +67,17 @@ export default async function JobsPage({ params, searchParams }: { params: Promi
                 <div className="flex items-end"><button className="btn w-full">Save</button></div>
               </form>
               {job.address && <p className="mt-2 text-xs text-muted">Site: {job.address}</p>}
+              {job.status === "completed" && (
+                <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3 text-sm">
+                  <span className="font-medium">Review</span>
+                  {review ? (
+                    <span className="text-muted">Requested {fmtDate(review.sent)}{review.clicked ? <> · <span className="text-good">customer opened the review link</span></> : " · not opened yet"}</span>
+                  ) : (
+                    <span className="text-muted">Not requested yet</span>
+                  )}
+                  <ActionForm action={sendReviewRequestNow.bind(null, b.slug, job.id)} submit={review ? "Send again" : "Ask for a review"} pendingText="Sending…" className="flex flex-wrap items-center gap-2"><span /></ActionForm>
+                </div>
+              )}
             </details>
           );
         })}

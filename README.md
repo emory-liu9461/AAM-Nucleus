@@ -63,6 +63,16 @@ How it works:
 
 Env: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `POSTMARK_SERVER_TOKEN`, `POSTMARK_INBOUND_TOKEN`, `APP_URL`, `ANTHROPIC_API_KEY`. US texting also needs A2P 10DLC registration in Twilio.
 
+## Launch essentials
+
+- **Alerts** (Settings → Alerts): an instant text and email for each new lead, AI booking, voicemail or missed call, and message the AI isn't answering. Sent from the business's Twilio number and email; at most one "needs a reply" alert per conversation every 30 minutes. Emails default to the owner logins. Includes a **Send test alert** button.
+- **Review requests** (Settings → Review requests): when a job is marked Completed, the customer gets the review link (Google, HomeStars…) by text and email through a tracked link (`/r/<token>`). Customers who don't open it get one reminder after N days (daily job). Each completed job shows whether the link was opened, with **Ask for a review** / **Send again**.
+- **Consent (CASL)**: every website form says the customer will be contacted about their request, and has an optional "send me offers and tips" box. Ticking it records `contacts.marketing_consent_at`.
+- **Project photos** (Social → Project photos): uploads are resized in the browser (max 1600px JPEG) and stored in Postgres, then served at `/api/public/photos/<id>` with long-lived caching. The website shows Recent projects on the home page, a Projects page, and photos on the matching service and city pages.
+- **Canadian money**: amounts show in CAD by default (`CURRENCY=USD` to switch). Settings → Sales tax (provincial presets) adds GST/HST/PST to new invoices, which store the subtotal, tax and tax label. Payment methods use Canadian names (e-Transfer, cheque).
+
+Daily jobs: `/api/cron/daily` (Vercel Cron, `CRON_SECRET`) syncs social stats and sends review reminders.
+
 ## Social stats
 
 Social → **Social stats** collects reviews, followers, views, likes and comments:
@@ -71,7 +81,7 @@ Social → **Social stats** collects reviews, followers, views, likes and commen
 - **YouTube** (API key): subscribers, total views, likes and comments on recent videos, and the newest comments.
 - **Every other channel** (HomeStars, Houzz, Yelp, TikTok, LinkedIn, Nextdoor…): numbers entered by hand.
 
-Connected accounts sync every morning (`/api/cron/social-sync`, Vercel Cron, protected by `CRON_SECRET`) and on **Update now**. Tokens are stored encrypted (AES-256-GCM, key derived from `AUTH_SECRET`). Each platform's API code lives in `src/lib/social-sync/` (`google.ts`, `meta.ts`, `youtube.ts`). If a platform changes its API, the exact error shows on that account's card. The dashboard's Marketing section shows followers and growth, reviews and the average rating, new reviews (and how many need a reply), and new comments.
+Connected accounts sync every morning (`/api/cron/daily`, Vercel Cron, protected by `CRON_SECRET`) and on **Update now**. Tokens are stored encrypted (AES-256-GCM, key derived from `AUTH_SECRET`). Each platform's API code lives in `src/lib/social-sync/` (`google.ts`, `meta.ts`, `youtube.ts`). If a platform changes its API, the exact error shows on that account's card. The dashboard's Marketing section shows followers and growth, reviews and the average rating, new reviews (and how many need a reply), and new comments.
 
 ## Website visit counting
 

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { QuoteForm } from "@/components/QuoteForm";
+import { ProjectGrid } from "@/components/Projects";
 import { CtaBand, PageHero, Reviews, endpointFor } from "@/components/Sections";
 import { getSite } from "@/lib/site";
 
@@ -48,6 +49,9 @@ export default async function AreaPage({ params }: Props) {
                 <div className="mt-4"><Reviews site={{ ...s, content: { ...c, reviews: local.length ? local : c.reviews } }} limit={2} /></div>
               </>
             )}
+            {(s.photos ?? []).some((p) => p.area === area.slug) && (
+              <><h2 className="mt-10 text-xl font-bold">Projects in {area.name}</h2><div className="mt-4"><ProjectGrid site={s} photos={(s.photos ?? []).filter((p) => p.area === area.slug)} limit={6} /></div></>
+            )}
             <h2 className="mt-10 text-xl font-bold">Also serving</h2>
             <p className="mt-2 text-muted">
               {c.serviceAreas.filter((a) => a.slug !== area.slug).map((a, i, arr) => (
@@ -56,7 +60,7 @@ export default async function AreaPage({ params }: Props) {
             </p>
           </div>
           <aside className="h-fit rounded-2xl border border-line bg-white p-6 shadow-xl shadow-slate-900/5 lg:sticky lg:top-24">
-            <QuoteForm endpoint={endpointFor(s)} services={c.services.map((x) => x.name)} compact heading={`Free quote in ${area.name}`} />
+            <QuoteForm businessName={s.business.name} endpoint={endpointFor(s)} services={c.services.map((x) => x.name)} compact heading={`Free quote in ${area.name}`} />
           </aside>
         </div>
       </section>

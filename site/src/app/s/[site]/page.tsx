@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Areas, CtaBand, Hero, Process, Reviews, Section, ServicesGrid, TrustBar } from "@/components/Sections";
 import { Icon } from "@/components/Icon";
+import { ProjectGrid } from "@/components/Projects";
 import { getSite } from "@/lib/site";
 
 export const revalidate = 60;
@@ -16,6 +17,11 @@ export default async function Home({ params }: { params: Promise<{ site: string 
         action={<Link href="/services" className="btn-outline text-sm">All services</Link>}>
         <ServicesGrid site={s} limit={6} />
       </Section>
+      {(s.photos?.length ?? 0) > 0 && (
+        <Section eyebrow="Our work" title="Recent projects" action={(s.photos?.length ?? 0) > 6 ? <Link href="/projects" className="btn-outline text-sm">All projects</Link> : undefined}>
+          <ProjectGrid site={s} limit={6} />
+        </Section>
+      )}
       <Process />
       {c.reviews.length > 0 && (
         <Section eyebrow="Reviews" title="What our customers say" action={c.reviews.length > 3 ? <Link href="/reviews" className="btn-outline text-sm">All reviews</Link> : undefined}>

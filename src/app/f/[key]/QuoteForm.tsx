@@ -58,6 +58,10 @@ export function QuoteForm({
           )}
         </label>
         <label className="field sm:col-span-2">Details<textarea className="input min-h-24" name="message" placeholder="Tell us about the project, timing, budget…" /></label>
+        <label className="flex items-start gap-2 text-sm text-muted sm:col-span-2">
+          <input type="checkbox" name="marketing_consent" value="yes" className="mt-1" />
+          <span>Also send me occasional offers and tips. Unsubscribe anytime.</span>
+        </label>
         {/* Honeypot: hidden from people, filled by bots */}
         <div aria-hidden="true" style={{ position: "absolute", left: "-10000px", width: 1, height: 1, overflow: "hidden" }}>
           <label>Company website<input name="company_website" tabIndex={-1} autoComplete="off" /></label>
@@ -66,7 +70,7 @@ export function QuoteForm({
         <div className="sm:col-span-2">
           {state?.error && <p className="mb-2 text-sm text-bad">{state.error}</p>}
           <button className="btn w-full py-2.5 text-base" disabled={pending}>{pending ? "Sending…" : "Request my quote"}</button>
-          <p className="mt-2 text-center text-xs text-muted">We&apos;ll only use your details to respond to this request.</p>
+          <p className="mt-2 text-center text-xs text-muted">By sending this, you agree we can contact you about your request by phone, text or email.</p>
         </div>
       </form>
     </div>

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { normalizeDomain, publicSite } from "@/lib/site-defaults";
 
@@ -18,5 +18,11 @@ export async function GET(req: NextRequest) {
   if (!where) return NextResponse.json({ error: "Pass ?domain= or ?slug=" }, { status: 400 });
   const [b] = await db.select().from(businesses).where(and(where, eq(businesses.archived, false)));
   if (!b) return NextResponse.json({ error: "No website for that domain" }, { status: 404 });
-  return NextResponse.json(publicSite(b), { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } });
+  const photos = await db
+    .select({ id: schema.projectPhotos.id, caption: schema.projectPhotos.caption, kind: schema.projectPhotos.kind, service: schema.projectPhotos.serviceSlug, area: schema.projectPhotos.areaSlug, width: schema.projectPhotos.width, height: schema.projectPhotos.height })
+    .from(schema.projectPhotos)
+    .where(eq(schema.projectPhotos.businessId, b.id))
+    .orderBy(desc(schema.projectPhotos.sortOrder))
+    .limit(60);
+  return NextResponse.json({ ...publicSite(b), photos }, { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } });
 }

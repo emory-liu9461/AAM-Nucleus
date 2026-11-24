@@ -70,6 +70,7 @@ export default async function SocialPage({ params }: { params: Promise<{ slug: s
           <p className="text-sm text-muted">Your website, social media and review sites. Every quote request lands in Leads, tagged with the channel it came from.</p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href={`/b/${b.slug}/social/photos`} className="btn-ghost">Project photos</Link>
           <Link href={`/b/${b.slug}/social/stats`} className="btn">Social stats</Link>
           <span className={`pill ${b.formEnabled ? "bg-green-500/15 text-green-700 dark:text-green-300" : "bg-gray-500/15 text-muted"}`}>
             {b.formEnabled ? "Accepting quote requests" : "Quote requests paused"}
