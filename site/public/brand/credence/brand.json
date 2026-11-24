@@ -1,0 +1,42 @@
+{
+  "navy": "#14213D",
+  "gold": "#C9A227",
+  "trades": [
+    {
+      "key": "painting",
+      "label": "Painting",
+      "accent": "#0F8B8D",
+      "accentOnDark": "#3CC4C6"
+    },
+    {
+      "key": "cleaning",
+      "label": "Cleaning",
+      "accent": "#2E9E5B",
+      "accentOnDark": "#5FD18C"
+    },
+    {
+      "key": "roofing",
+      "label": "Roofing",
+      "accent": "#B5452F",
+      "accentOnDark": "#E57A63"
+    },
+    {
+      "key": "renovations",
+      "label": "Renovations",
+      "accent": "#B8730A",
+      "accentOnDark": "#E9A63F"
+    },
+    {
+      "key": "concrete",
+      "label": "Concrete",
+      "accent": "#5B6B7F",
+      "accentOnDark": "#9FB0C4"
+    },
+    {
+      "key": "landscaping",
+      "label": "Landscaping",
+      "accent": "#4C8C2B",
+      "accentOnDark": "#7FC25A"
+    }
+  ]
+}

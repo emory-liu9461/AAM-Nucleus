@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Site } from "@/lib/site";
-import { telHref } from "@/lib/site";
+import { logoSrc, telHref } from "@/lib/site";
 import { Icon } from "./Icon";
 
 const NAV = [
@@ -17,9 +17,16 @@ export function Header({ site }: { site: Site }) {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-white/95 backdrop-blur">
       <div className="wrap flex h-16 items-center gap-6">
-        <Link href="/" className="flex min-w-0 items-center gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand text-lg font-black text-white">{b.name.trim()[0]}</span>
-          <span className="truncate text-lg font-bold leading-tight">{b.name}</span>
+        <Link href="/" className="flex min-w-0 items-center gap-2.5" aria-label={`${b.name} home`}>
+          {b.logo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoSrc(b.logo)} alt={b.name} className="h-10 w-auto sm:h-11" />
+          ) : (
+            <>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand text-lg font-black text-white">{b.name.trim()[0]}</span>
+              <span className="truncate text-lg font-bold leading-tight">{b.name}</span>
+            </>
+          )}
         </Link>
         <nav className="ml-auto hidden items-center gap-6 text-sm font-medium text-muted lg:flex">
           {nav.map(([href, label]) => (

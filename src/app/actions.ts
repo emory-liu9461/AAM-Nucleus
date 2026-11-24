@@ -7,7 +7,7 @@ import { z } from "zod";
 import { db, schema } from "@/db";
 import { dollarsToCents, slugify } from "@/lib/format";
 import { can, requireBusiness, requirePermission } from "@/lib/session";
-import { normalizeDomain } from "@/lib/site-defaults";
+import { BRAND_LOGOS, normalizeDomain } from "@/lib/site-defaults";
 import type { AlertSettings, AssistantSettings, EmailSettings, PhoneSettings, ReviewSettings, SiteContent } from "@/db/schema";
 import { alertSettings, notify } from "@/lib/alerts";
 import { reviewSettings, sendReviewRequest } from "@/lib/reviews";
@@ -322,7 +322,10 @@ export async function updateSiteContent(slug: string, _: { error?: string; ok?: 
     if (taken) return { error: `${domain} is already used by another business` };
   }
   const years = Number(str(form, "yearsInBusiness"));
+  const logoKey = str(form, "logo") ?? undefined;
+  const logo = logoKey === "none" || BRAND_LOGOS.some((l) => l.key === logoKey) ? logoKey : undefined;
   const site: SiteContent = {
+    logo,
     tagline: str(form, "tagline") ?? undefined,
     heroHeadline: str(form, "heroHeadline") ?? undefined,
     heroSubheadline: str(form, "heroSubheadline") ?? undefined,
@@ -346,9 +349,11 @@ export async function updateSiteContent(slug: string, _: { error?: string; ok?: 
     social: b.site?.social ?? {}, // edited on the Social tab
     analytics: { ga4: str(form, "ga4") ?? undefined, googleAds: str(form, "googleAds") ?? undefined, metaPixel: str(form, "metaPixel") ?? undefined },
   };
-  await db.update(businesses).set({ domain, site }).where(eq(businesses.id, b.id));
-  revalidatePath(`/b/${slug}/social`, "layout");
-  return { ok: "Saved. The live website updates within about a minute." };
+  // A newly chosen trade logo brings its brand color with it.
+  const picked = logo && logo !== b.site?.logo ? BRAND_LOGOS.find((l) => l.key === logo && l.key !== "credence") : undefined;
+  await db.update(businesses).set({ domain, site, ...(picked ? { color: picked.accent } : {}) }).where(eq(businesses.id, b.id));
+  revalidatePath("/", "layout");
+  return { ok: `Saved.${picked ? ` Brand color set to match ${picked.name}.` : ""} The live website updates within about a minute.` };
 }
 
 /* ---------- AI website assistant (owner) ---------- */

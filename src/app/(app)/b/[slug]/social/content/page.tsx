@@ -2,7 +2,7 @@ import Link from "next/link";
 import { updateSiteContent } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { requireBusinessPage } from "@/lib/session";
-import { publicSite } from "@/lib/site-defaults";
+import { BRAND_LOGOS, logoFor, publicSite } from "@/lib/site-defaults";
 import { websiteBaseUrl } from "@/lib/app-settings";
 
 export default async function SiteContentPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -10,6 +10,8 @@ export default async function SiteContentPage({ params }: { params: Promise<{ sl
   const { business: b } = await requireBusinessPage(slug, "manage_business");
   const c = b.site ?? {};
   const d = publicSite(b).content; // defaults shown as placeholders
+  const currentLogo = logoFor(b);
+  const autoLogo = logoFor({ ...b, site: { ...(b.site ?? {}), logo: undefined } });
   const previewBase = await websiteBaseUrl();
 
   return (
@@ -46,6 +48,25 @@ export default async function SiteContentPage({ params }: { params: Promise<{ sl
             <input className="input" name="domain" defaultValue={b.domain ?? ""} placeholder="yourcompany.com" />
             <span className="font-normal">The address customers type. Add the same domain to the website project in Vercel. Both yourcompany.com and www.yourcompany.com work.</span>
           </label>
+        </Card>
+
+        <Card title="Logo">
+          <label className="field">Logo shown on the website
+            <select className="input" name="logo" defaultValue={c.logo ?? ""}>
+              <option value="">Automatic{autoLogo ? ` (${BRAND_LOGOS.find((l) => l.key === autoLogo)?.name})` : " (business name as text)"}</option>
+              {BRAND_LOGOS.map((l) => <option key={l.key} value={l.key}>{l.name}</option>)}
+              <option value="none">No logo (business name as text)</option>
+            </select>
+            <span className="font-normal">Choosing a trade logo also sets this business&apos;s brand color to match.</span>
+          </label>
+          <div className="flex items-center justify-center rounded-lg border border-line bg-white p-3">
+            {currentLogo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={`/brand/credence/${currentLogo}.svg`} alt="Current logo" className="h-12 w-auto" />
+            ) : (
+              <span className="text-sm text-muted">{b.name} (text)</span>
+            )}
+          </div>
         </Card>
 
         <Card title="Top of the home page">

@@ -3,7 +3,7 @@ import { Analytics, TrackAttribution, TrackVisit } from "@/components/Tracking";
 import { Footer, MobileBar } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { ChatWidget } from "@/components/ChatWidget";
-import { getSite, nucleusUrl, schemaType, siteUrl } from "@/lib/site";
+import { getSite, logoSrc, nucleusUrl, schemaType, siteUrl } from "@/lib/site";
 
 type Props = { params: Promise<{ site: string }> };
 
@@ -17,6 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: { siteName: s.business.name, type: "website" },
     // Preview addresses (no domain yet) shouldn't appear in Google.
     robots: base ? undefined : { index: false, follow: false },
+    icons: s.business.logo ? { icon: logoSrc(s.business.logo, "-mark"), apple: logoSrc(s.business.logo, "-mark") } : undefined,
   };
 }
 
@@ -34,6 +35,7 @@ export default async function SiteLayout({ children, params }: Props & { childre
     areaServed: s.content.serviceAreas.length ? s.content.serviceAreas.map((a) => ({ "@type": "City", name: a.name })) : s.content.primaryCity || undefined,
     openingHours: undefined,
     sameAs: Object.values(s.content.social).filter(Boolean),
+    logo: s.business.logo && base ? `${base}${logoSrc(s.business.logo)}` : undefined,
   };
   return (
     <div style={{ ["--brand" as string]: s.business.color }} className="site-theme flex min-h-screen flex-col">

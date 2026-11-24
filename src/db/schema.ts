@@ -298,6 +298,7 @@ export const scheduleEvents = pgTable(
 
 /** Editable content for a business's public website. Empty fields fall back to trade defaults. */
 export type SiteContent = {
+  logo?: string; // brand logo key, e.g. "credence-painting" ("none" = text name); empty = automatic
   tagline?: string;
   heroHeadline?: string;
   heroSubheadline?: string;

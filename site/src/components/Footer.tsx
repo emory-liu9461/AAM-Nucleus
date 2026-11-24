@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Site } from "@/lib/site";
-import { SOCIAL_NAMES, telHref } from "@/lib/site";
+import { SOCIAL_NAMES, logoSrc, telHref } from "@/lib/site";
 import { Icon } from "./Icon";
 
 export function Footer({ site }: { site: Site }) {
@@ -10,7 +10,12 @@ export function Footer({ site }: { site: Site }) {
     <footer className="border-t border-line bg-surface pb-24 pt-14 sm:pb-10">
       <div className="wrap grid gap-10 md:grid-cols-4">
         <div className="md:col-span-2">
-          <div className="text-lg font-bold">{b.name}</div>
+          {b.logo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoSrc(b.logo)} alt={b.name} className="h-11 w-auto" />
+          ) : (
+            <div className="text-lg font-bold">{b.name}</div>
+          )}
           <p className="mt-2 max-w-sm text-sm text-muted">{c.tagline}</p>
           <ul className="mt-4 space-y-2 text-sm">
             {b.phone && <li><a className="flex items-center gap-2 hover:text-brand" href={telHref(b.phone)}><Icon name="phone" className="h-4 w-4 text-brand" />{b.phone}</a></li>}

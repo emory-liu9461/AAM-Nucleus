@@ -48,6 +48,32 @@ const PRESETS: Record<string, Preset> = {
       { name: "Commercial Painting", summary: "Offices, retail and rentals, scheduled around your business hours." },
     ],
   },
+  cleaning: {
+    hero: "A spotless space, without the hassle",
+    sub: "Reliable home and office cleaning by a vetted, insured team, on your schedule.",
+    warranty: "100% satisfaction: if something's missed, we come back and fix it",
+    services: [
+      { name: "Regular House Cleaning", summary: "Weekly, bi-weekly or monthly cleaning so your home always feels fresh." },
+      { name: "Deep Cleaning", summary: "Top-to-bottom cleaning of kitchens, bathrooms, baseboards and more." },
+      { name: "Move-In / Move-Out Cleaning", summary: "Empty-home cleaning that gets deposits back and new homes ready." },
+      { name: "Post-Construction Cleaning", summary: "Dust, debris and residue removed after renovations and new builds." },
+      { name: "Office & Commercial Cleaning", summary: "After-hours cleaning for offices, retail and common areas." },
+      { name: "Window Cleaning", summary: "Streak-free interior and exterior windows, frames and tracks." },
+    ],
+  },
+  landscaping: {
+    hero: "Outdoor spaces you'll want to spend time in",
+    sub: "Lawn care, gardens, hardscaping and seasonal cleanups for homes and businesses.",
+    warranty: "Workmanship warranty on all installations",
+    services: [
+      { name: "Lawn Care", summary: "Mowing, edging, aeration and fertilizing for a healthy lawn." },
+      { name: "Garden Design & Planting", summary: "Beds, shrubs and trees chosen to thrive in your yard." },
+      { name: "Patios & Walkways", summary: "Interlock, flagstone and pavers, built on a solid base." },
+      { name: "Retaining Walls", summary: "Durable walls that hold back soil and add usable space." },
+      { name: "Spring & Fall Cleanups", summary: "Leaves, debris and beds cleared and ready for the season." },
+      { name: "Snow Removal", summary: "Reliable winter plowing and shovelling for driveways and walkways." },
+    ],
+  },
   concrete: {
     hero: "Concrete work built to last",
     sub: "Driveways, patios, foundations and flatwork, done on schedule.",
@@ -78,11 +104,33 @@ function presetFor(trade: string): Preset {
   if (t.includes("roof")) return PRESETS.roofing;
   if (t.includes("remodel") || t.includes("renovat") || t.includes("kitchen") || t.includes("bath")) return PRESETS.remodeling;
   if (t.includes("paint") || t.includes("stain") || t.includes("coating")) return PRESETS.painting;
+  if (t.includes("clean") || t.includes("janitor") || t.includes("maid")) return PRESETS.cleaning;
+  if (t.includes("landscap") || t.includes("lawn") || t.includes("garden")) return PRESETS.landscaping;
   if (t.includes("concrete") || t.includes("paving") || t.includes("masonry")) return PRESETS.concrete;
   return PRESETS.general;
 }
 
 export type PublicSite = ReturnType<typeof publicSite>;
+
+/** The Credence logo family (files in public/brand/credence and site/public/brand/credence). */
+export const BRAND_LOGOS: { key: string; name: string; accent: string; trade: RegExp }[] = [
+  { key: "credence-painting", name: "Credence Painting", accent: "#0F8B8D", trade: /paint|stain|coating/i },
+  { key: "credence-cleaning", name: "Credence Cleaning", accent: "#2E9E5B", trade: /clean|janitor|maid/i },
+  { key: "credence-roofing", name: "Credence Roofing", accent: "#B5452F", trade: /roof/i },
+  { key: "credence-renovations", name: "Credence Renovations", accent: "#B8730A", trade: /remodel|renovat|kitchen|bath/i },
+  { key: "credence-concrete", name: "Credence Concrete", accent: "#5B6B7F", trade: /concrete|paving|masonry/i },
+  { key: "credence-landscaping", name: "Credence Landscaping", accent: "#4C8C2B", trade: /landscap|lawn|garden/i },
+  { key: "credence", name: "Credence (parent brand)", accent: "#14213D", trade: /$^/ },
+];
+
+/** Chosen logo, or automatic: a business named "Credence…" gets the logo matching its trade. */
+export function logoFor(b: Pick<Business, "name" | "trade" | "site">) {
+  const chosen = b.site?.logo;
+  if (chosen === "none") return null;
+  if (chosen && BRAND_LOGOS.some((l) => l.key === chosen)) return chosen;
+  if (!/^credence\b/i.test(b.name.trim())) return null;
+  return BRAND_LOGOS.find((l) => l.trade.test(b.trade) || l.trade.test(b.name))?.key ?? "credence";
+}
 
 /** Everything the public website needs, and nothing private. */
 export function publicSite(b: Business) {
@@ -102,6 +150,7 @@ export function publicSite(b: Business) {
       email: b.email,
       domain: b.domain,
       formKey: b.formEnabled ? b.formKey : null,
+      logo: logoFor(b),
       // Show the AI chat on the website only when it's switched on and an API key is set.
       assistant: Boolean(b.assistant?.enabled && b.formEnabled && process.env.ANTHROPIC_API_KEY),
     },
