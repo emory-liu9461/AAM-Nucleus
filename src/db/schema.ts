@@ -421,6 +421,23 @@ export type PhoneSettings = {
   smsAssistant?: boolean; // AI replies to texts
 };
 
+/** Page views on the public websites (no cookies; a per-tab session id groups a visit). */
+export const siteVisits = pgTable(
+  "site_visits",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    sessionId: text("session_id").notNull(),
+    path: text("path").notNull(),
+    source: text("source").notNull(), // google, facebook, direct, referral domain…
+    newSession: boolean("new_session").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("visits_business_idx").on(t.businessId, t.createdAt)],
+);
+
 /** App-wide settings editable in Nucleus (e.g. the website project's address). */
 export const appSettings = pgTable("app_settings", {
   key: text("key").primaryKey(),

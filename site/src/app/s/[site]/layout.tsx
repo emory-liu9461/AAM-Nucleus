@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Analytics, TrackAttribution } from "@/components/Tracking";
+import { Analytics, TrackAttribution, TrackVisit } from "@/components/Tracking";
 import { Footer, MobileBar } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { ChatWidget } from "@/components/ChatWidget";
@@ -46,6 +46,7 @@ export default async function SiteLayout({ children, params }: Props & { childre
         <ChatWidget endpoint={`${nucleusUrl()}/api/public/chat/${s.business.formKey}`} businessName={s.business.name} phone={s.business.phone} />
       )}
       <TrackAttribution />
+      {s.business.formKey && <TrackVisit endpoint={`${nucleusUrl()}/api/public/track/${s.business.formKey}`} />}
       <Analytics {...s.content.analytics} />
     </div>
   );

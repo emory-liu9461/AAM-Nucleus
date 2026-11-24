@@ -3,8 +3,9 @@ import type { Business } from "@/db/schema";
 import { money, pct, label, fmtDateTime } from "@/lib/format";
 import {
   avgJob, businessMetrics, closeRate, grossMargin, leadsBySource, monthlyCollected, resolveRange,
-  sumMetrics, upcomingEvents,
+  marketingMetrics, sumMarketing, sumMetrics, upcomingEvents,
 } from "@/lib/metrics";
+import { MarketingStats } from "./MarketingStats";
 import { Kpi } from "./Kpi";
 import { RangePicker } from "./RangePicker";
 import { RevenueChart } from "./RevenueChart";
@@ -13,11 +14,12 @@ import { RevenueChart } from "./RevenueChart";
 export async function Dashboard({ title, subtitle, list, range }: { title: string; subtitle?: string; list: Business[]; range?: string }) {
   const r = resolveRange(range);
   const ids = list.map((b) => b.id);
-  const [per, monthly, sources, events] = await Promise.all([
+  const [per, monthly, sources, events, mkt] = await Promise.all([
     Promise.all(list.map((b) => businessMetrics(b.id, r.from, r.to))),
     monthlyCollected(ids),
     leadsBySource(ids, r.from, r.to),
     upcomingEvents(ids, 7),
+    Promise.all(list.map((b) => marketingMetrics(b.id, r.from, r.to))),
   ]);
   const t = sumMetrics(per);
   const byId = Object.fromEntries(list.map((b) => [b.id, b]));
@@ -44,6 +46,8 @@ export async function Dashboard({ title, subtitle, list, range }: { title: strin
         <Kpi label="Completed job revenue" value={money(t.completedRevenue)} sub="jobs finished in period" />
         <Kpi label="Gross margin" value={pct(grossMargin(t))} sub={`${money(t.completedRevenue - t.completedCost)} gross profit`} tone={(grossMargin(t) ?? 1) < 0.2 ? "bad" : "good"} />
       </section>
+
+      <MarketingStats m={sumMarketing(mkt)} per={mkt} list={list} />
 
       <section className="card">
         <div className="card-title">Cash collected · last 12 months</div>

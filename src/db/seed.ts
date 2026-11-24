@@ -60,6 +60,7 @@ async function main() {
   }
 
   const now = new Date();
+  const day_ms = day;
   const created: string[] = [];
   for (const b of BUSINESSES) {
     const [biz] = await db
@@ -100,7 +101,13 @@ async function main() {
       const project = pick(b.projects);
       const [lead] = await db
         .insert(schema.leads)
-        .values({ businessId: biz.id, contactId: contact.id, title: project, stage, source, estimatedValue: value, createdAt: created, closedAt })
+        .values({
+          businessId: biz.id, contactId: contact.id, title: project, stage, source, estimatedValue: value, createdAt: created, closedAt,
+          // Demo mix of how leads arrived, for the Marketing dashboard.
+          attribution: source === "website" || source === "google" || source === "facebook"
+            ? { channel: "site", formName: rand() < 0.25 ? "chat-assistant" : "site-intake" }
+            : rand() < 0.3 ? { channel: "chat", formName: pick(["sms", "phone-call", "email"] as const) } : null,
+        })
         .returning();
 
       if (stage !== "won" || !closedAt) continue;
@@ -197,6 +204,33 @@ async function main() {
     }
     created.push(biz.id);
     console.log(`Seeded ${b.name} (${leadCount} leads)`);
+  }
+
+  // Demo marketing activity (website visits, calls, texts, emails) for the dashboard.
+  for (const businessId of created) {
+    const visits: (typeof schema.siteVisits.$inferInsert)[] = [];
+    const callRows: (typeof schema.calls.$inferInsert)[] = [];
+    const msgs: (typeof schema.inboxMessages.$inferInsert)[] = [];
+    for (let d = 0; d < 365; d++) {
+      const day = new Date(now.getTime() - d * day_ms);
+      for (let v = 0; v < between(3, 14); v++) {
+        const session = `demo${businessId.slice(0, 6)}${d}x${v}`;
+        const source = pick(["google", "google", "google", "direct", "direct", "facebook", "bing", "nextdoor.com", "angi.com"] as const);
+        for (let p = 0; p < between(1, 4); p++) visits.push({ businessId, sessionId: session, path: pick(["/", "/services", "/quote", "/about", "/areas"] as const), source, newSession: p === 0, createdAt: new Date(day.getTime() - between(0, 80000) * 1000) });
+      }
+      for (let c = 0; c < between(0, 3); c++) {
+        const status = pick(["answered", "answered", "answered", "missed", "voicemail"] as const);
+        callRows.push({ businessId, callSid: `CAdemo${businessId.slice(0, 6)}${d}x${c}`, fromNumber: `+1555${between(1000000, 9999999)}`, toNumber: "+15550000000", status, durationSec: status === "answered" ? between(40, 600) : null, textedBack: status !== "answered", createdAt: new Date(day.getTime() - between(0, 80000) * 1000) });
+      }
+      for (let t = 0; t < between(0, 4); t++) {
+        const channel = rand() < 0.75 ? "sms" : "email";
+        msgs.push({ businessId, channel, direction: "in", author: "customer", body: "Demo message", fromAddr: "demo", toAddr: "demo", createdAt: new Date(day.getTime() - between(0, 80000) * 1000) });
+        if (rand() < 0.8) msgs.push({ businessId, channel, direction: "out", author: "assistant", body: "Demo reply", fromAddr: "demo", toAddr: "demo", createdAt: new Date(day.getTime() - between(0, 80000) * 1000) });
+      }
+    }
+    for (let i = 0; i < visits.length; i += 2000) await db.insert(schema.siteVisits).values(visits.slice(i, i + 2000));
+    if (callRows.length) await db.insert(schema.calls).values(callRows);
+    if (msgs.length) await db.insert(schema.inboxMessages).values(msgs);
   }
 
   // Demo painting business with a ready-to-view sample website (no fake reviews).

@@ -220,3 +220,98 @@ export async function upcomingEvents(businessIds: string[], days = 7) {
 export async function activeBusinesses(): Promise<Business[]> {
   return db.select().from(businesses).where(eq(businesses.archived, false)).orderBy(asc(businesses.createdAt));
 }
+
+/* ---------------- marketing ---------------- */
+
+export type MarketingMetrics = {
+  visits: number; // visits (sessions)
+  pageViews: number;
+  websiteLeads: number; // website forms + website chat leads
+  chats: number;
+  textsIn: number;
+  textsAutoReplied: number;
+  emailsIn: number;
+  calls: number;
+  callsAnswered: number;
+  callsMissed: number; // includes voicemails
+  voicemails: number;
+  textBacks: number;
+  aiBookings: number;
+  sources: Record<string, number>; // visits by source
+  leadChannels: Record<string, number>; // leads by how they reached you
+};
+
+export const LEAD_CHANNEL_SQL = sql<string>`case
+  when ${leads.attribution}->>'formName' = 'sms' then 'Text message'
+  when ${leads.attribution}->>'formName' = 'phone-call' then 'Phone call'
+  when ${leads.attribution}->>'formName' = 'email' then 'Email'
+  when ${leads.attribution}->>'formName' = 'chat-assistant' then 'Website chat'
+  when ${leads.attribution}->>'channel' in ('site','embed','hosted','api') then 'Website form'
+  else 'Added by team' end`;
+
+export async function marketingMetrics(businessId: string, from: Date, to: Date): Promise<MarketingMetrics> {
+  const f = from.toISOString();
+  const t = to.toISOString();
+  const { siteVisits, inboxMessages, calls, chatConversations } = schema;
+  const [v, src, l, ch, msg, cl, booked] = await Promise.all([
+    db.select({ visits: sql`count(distinct ${siteVisits.sessionId})`, views: sql`count(*)` }).from(siteVisits)
+      .where(and(eq(siteVisits.businessId, businessId), sql`${siteVisits.createdAt} >= ${f}::timestamptz and ${siteVisits.createdAt} < ${t}::timestamptz`)),
+    db.select({ source: siteVisits.source, n: sql`count(distinct ${siteVisits.sessionId})` }).from(siteVisits)
+      .where(and(eq(siteVisits.businessId, businessId), sql`${siteVisits.createdAt} >= ${f}::timestamptz and ${siteVisits.createdAt} < ${t}::timestamptz`))
+      .groupBy(siteVisits.source),
+    db.select({ channel: LEAD_CHANNEL_SQL, n: sql`count(*)` }).from(leads)
+      .where(and(eq(leads.businessId, businessId), sql`${leads.createdAt} >= ${f}::timestamptz and ${leads.createdAt} < ${t}::timestamptz`))
+      .groupBy(sql`1`),
+    db.select({ n: sql`count(*)` }).from(chatConversations)
+      .where(and(eq(chatConversations.businessId, businessId), eq(chatConversations.channel, "web"), sql`${chatConversations.createdAt} >= ${f}::timestamptz and ${chatConversations.createdAt} < ${t}::timestamptz`)),
+    db.select({
+      textsIn: sql`count(*) filter (where ${inboxMessages.channel} = 'sms' and ${inboxMessages.direction} = 'in')`,
+      textsAi: sql`count(*) filter (where ${inboxMessages.channel} = 'sms' and ${inboxMessages.author} = 'assistant')`,
+      emailsIn: sql`count(*) filter (where ${inboxMessages.channel} = 'email' and ${inboxMessages.direction} = 'in')`,
+    }).from(inboxMessages)
+      .where(and(eq(inboxMessages.businessId, businessId), sql`${inboxMessages.createdAt} >= ${f}::timestamptz and ${inboxMessages.createdAt} < ${t}::timestamptz`)),
+    db.select({
+      total: sql`count(*)`,
+      answered: sql`count(*) filter (where ${calls.status} = 'answered')`,
+      missed: sql`count(*) filter (where ${calls.status} in ('missed','voicemail'))`,
+      voicemail: sql`count(*) filter (where ${calls.status} = 'voicemail')`,
+      textBacks: sql`count(*) filter (where ${calls.textedBack})`,
+    }).from(calls)
+      .where(and(eq(calls.businessId, businessId), sql`${calls.createdAt} >= ${f}::timestamptz and ${calls.createdAt} < ${t}::timestamptz`)),
+    db.select({ n: sql`count(*)` }).from(chatConversations)
+      .where(and(eq(chatConversations.businessId, businessId), eq(chatConversations.status, "booked"), sql`${chatConversations.updatedAt} >= ${f}::timestamptz and ${chatConversations.updatedAt} < ${t}::timestamptz`)),
+  ]);
+  const leadChannels = Object.fromEntries(l.map((r) => [r.channel, n(r.n)]));
+  return {
+    visits: n(v[0]?.visits),
+    pageViews: n(v[0]?.views),
+    websiteLeads: (leadChannels["Website form"] ?? 0) + (leadChannels["Website chat"] ?? 0),
+    chats: n(ch[0]?.n),
+    textsIn: n(msg[0]?.textsIn),
+    textsAutoReplied: n(msg[0]?.textsAi),
+    emailsIn: n(msg[0]?.emailsIn),
+    calls: n(cl[0]?.total),
+    callsAnswered: n(cl[0]?.answered),
+    callsMissed: n(cl[0]?.missed),
+    voicemails: n(cl[0]?.voicemail),
+    textBacks: n(cl[0]?.textBacks),
+    aiBookings: n(booked[0]?.n),
+    sources: Object.fromEntries(src.map((r) => [r.source, n(r.n)])),
+    leadChannels,
+  };
+}
+
+export function sumMarketing(list: MarketingMetrics[]): MarketingMetrics {
+  const out: MarketingMetrics = {
+    visits: 0, pageViews: 0, websiteLeads: 0, chats: 0, textsIn: 0, textsAutoReplied: 0, emailsIn: 0, calls: 0,
+    callsAnswered: 0, callsMissed: 0, voicemails: 0, textBacks: 0, aiBookings: 0, sources: {}, leadChannels: {},
+  };
+  for (const m of list) {
+    for (const k of Object.keys(out) as (keyof MarketingMetrics)[]) {
+      if (k === "sources" || k === "leadChannels") {
+        for (const [name, v] of Object.entries(m[k])) out[k][name] = (out[k][name] ?? 0) + v;
+      } else (out[k] as number) += m[k] as number;
+    }
+  }
+  return out;
+}

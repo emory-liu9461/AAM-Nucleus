@@ -57,6 +57,13 @@
       "when": 1795530810845,
       "tag": "0007_app_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795530985136,
+      "tag": "0008_site_visits",
+      "breakpoints": true
     }
   ]
 }

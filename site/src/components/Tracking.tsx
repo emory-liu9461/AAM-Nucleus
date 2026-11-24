@@ -2,6 +2,7 @@
 
 import Script from "next/script";
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 const TAGS = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "gclid", "fbclid"];
 
@@ -47,5 +48,30 @@ export function LeadConversion() {
     w.gtag?.("event", "generate_lead");
     w.fbq?.("track", "Lead");
   }, []);
+  return null;
+}
+
+/** Counts page views for the Nucleus dashboard. No cookies; a per-tab id groups one visit. */
+export function TrackVisit({ endpoint }: { endpoint: string }) {
+  const pathname = usePathname();
+  useEffect(() => {
+    try {
+      if (window.self !== window.top) return; // the Nucleus live preview isn't a real visit
+      let session = sessionStorage.getItem("site_session");
+      const newSession = !session;
+      if (!session) {
+        session = Math.random().toString(36).slice(2) + Date.now().toString(36);
+        sessionStorage.setItem("site_session", session);
+      }
+      const attr = JSON.parse(sessionStorage.getItem("site_attr") || "{}");
+      let source = attr.utm_source || (attr.gclid ? "google" : attr.fbclid ? "facebook" : "");
+      if (!source && attr.referrer) {
+        const host = new URL(attr.referrer).hostname.replace(/^www\./, "");
+        source = /google\./.test(host) ? "google" : /facebook|instagram|fb\.com/.test(host) ? "facebook" : /bing\./.test(host) ? "bing" : host === location.hostname ? "direct" : host;
+      }
+      const body = JSON.stringify({ path: pathname, session, newSession, source: source || "direct" });
+      if (!navigator.sendBeacon?.(endpoint, new Blob([body], { type: "text/plain" }))) fetch(endpoint, { method: "POST", body, keepalive: true }).catch(() => {});
+    } catch {}
+  }, [pathname, endpoint]);
   return null;
 }

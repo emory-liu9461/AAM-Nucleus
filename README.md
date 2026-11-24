@@ -8,6 +8,7 @@ A web app for running several construction businesses from one place: a combined
 |---|---|
 | **All businesses dashboard** (`/`) | Combined KPIs across every active business: cash collected, sales won, pipeline, close rate, A/R and overdue, active jobs, gross margin. Also a 12-month revenue chart stacked by business, a per-business comparison table, leads by source, and the next 7 days of appointments. Date range picker. |
 | **Business dashboard** (`/b/:slug`) | The same view filtered to one business. |
+| **Marketing** (on both dashboards) | Website visits and page views, where visitors come from, leads from the website and the visit-to-lead rate, phone calls (answered, missed, voicemail, answer rate), texts (received, AI replies, missed-call texts), emails, bookings made by the AI, and how new leads reached you. |
 | **Leads** | Pipeline stages (New → Contacted → Site visit → Estimate sent → Won/Lost), stage totals, quick lead capture. Marking a lead **Won** creates its job automatically. |
 | **Contacts** | Search, plus jobs count and lifetime value per customer. |
 | **Jobs** | Status, contract value, estimated vs. actual cost, margin, billed vs. paid. |
@@ -61,6 +62,10 @@ How it works:
 - Every Twilio request is verified with Twilio's signature (needs `APP_URL` to match the address set in Twilio). Postmark is verified by the secret in the URL. One AI reply runs at a time per conversation.
 
 Env: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `POSTMARK_SERVER_TOKEN`, `POSTMARK_INBOUND_TOKEN`, `APP_URL`, `ANTHROPIC_API_KEY`. US texting also needs A2P 10DLC registration in Twilio.
+
+## Website visit counting
+
+The website sends one small, cookie-free beacon per page view to `POST /api/public/track/{formKey}`. A per-tab session id groups page views into a visit, and the source comes from ad/UTM tags or the referring site. Bots and headless browsers are ignored, as are views inside the Nucleus live preview and thank-you pages.
 
 ## Users and roles
 
