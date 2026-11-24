@@ -22,7 +22,7 @@ export type Site = {
     domain: string | null;
     formKey: string | null;
     assistant?: boolean;
-    logo?: string | null; // e.g. "archen-painting" -> /brand/archen/archen-painting.svg
+    logo?: string | null; // e.g. "arcus-painting" -> /brand/arcus/arcus-painting.svg
   };
   content: {
     tagline: string;
@@ -77,5 +77,5 @@ export const SOCIAL_NAMES: [string, string][] = [
   ["homestars", "HomeStars"], ["yelp", "Yelp"], ["angi", "Angi"],
 ];
 
-/** Brand logo files (horizontal logo and square icon) for a logo key. Old "credence-…" and "astra-…" keys still in a cache map to Archen. */
-export const logoSrc = (key: string, variant: "" | "-white" | "-mark" = "") => `/brand/archen/${key.replace(/^(credence|astra)/, "archen")}${variant}.svg`;
+/** Brand logo files (horizontal logo and square icon) for a logo key. Logos saved under earlier brand names (Credence, Astra, Archen) still in a cache map to Arcus. */
+export const logoSrc = (key: string, variant: "" | "-white" | "-mark" = "") => `/brand/arcus/${key.replace(/^(credence|astra|archen)/, "arcus")}${variant}.svg`;
