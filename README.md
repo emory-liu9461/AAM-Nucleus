@@ -63,12 +63,12 @@ How it works:
 
 Env: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `POSTMARK_SERVER_TOKEN`, `POSTMARK_INBOUND_TOKEN`, `APP_URL`, `ANTHROPIC_API_KEY`. US texting also needs A2P 10DLC registration in Twilio.
 
-## Branding: Credence
+## Branding: Archen
 
-The businesses are branded as **Credence** (parent brand) plus a trade: Credence Painting, Cleaning, Roofing, Renovations, Concrete and Landscaping. The logo files and brand guide are in `public/brand/credence/` (also copied to `site/public/brand/credence/`): horizontal, white-on-dark, stacked and badge versions of each.
+The businesses are branded as **archen.** (parent brand) plus a trade: Archen Construction, Painting, Cleaning, Roofing, Renovations, Concrete and Landscaping. The logo files and brand guide are in `public/brand/archen/` (also copied to `site/public/brand/archen/`): horizontal, white-on-dark, stacked and square icon versions of each.
 
-- A business named "Credence …" automatically gets the logo for its trade. To pick one by hand, use Social → Edit website content → Logo. Choosing a trade logo also sets the business's brand color.
-- The website shows the logo in the header and footer, uses the badge as the browser tab icon, and includes the logo in Google's business data.
+- A business named "Archen …" automatically gets the logo for its trade. To pick one by hand, use Social → Edit website content → Logo. Choosing a trade logo also sets the business's brand color.
+- The website shows the logo in the header and footer, uses the square icon as the browser tab icon, and includes the logo in Google's business data.
 - Cleaning and Landscaping have their own website presets (services, headline, wording).
 
 ## Launch essentials

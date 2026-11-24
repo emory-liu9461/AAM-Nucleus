@@ -62,7 +62,7 @@ export default async function SiteContentPage({ params }: { params: Promise<{ sl
           <div className="flex items-center justify-center rounded-lg border border-line bg-white p-3">
             {currentLogo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={`/brand/credence/${currentLogo}.svg`} alt="Current logo" className="h-12 w-auto" />
+              <img src={`/brand/archen/${currentLogo}.svg`} alt="Current logo" className="h-12 w-auto" />
             ) : (
               <span className="text-sm text-muted">{b.name} (text)</span>
             )}

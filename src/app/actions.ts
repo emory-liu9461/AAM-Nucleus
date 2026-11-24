@@ -350,7 +350,7 @@ export async function updateSiteContent(slug: string, _: { error?: string; ok?: 
     analytics: { ga4: str(form, "ga4") ?? undefined, googleAds: str(form, "googleAds") ?? undefined, metaPixel: str(form, "metaPixel") ?? undefined },
   };
   // A newly chosen trade logo brings its brand color with it.
-  const picked = logo && logo !== b.site?.logo ? BRAND_LOGOS.find((l) => l.key === logo && l.key !== "credence") : undefined;
+  const picked = logo && logo !== b.site?.logo ? BRAND_LOGOS.find((l) => l.key === logo && l.key !== "archen") : undefined;
   await db.update(businesses).set({ domain, site, ...(picked ? { color: picked.accent } : {}) }).where(eq(businesses.id, b.id));
   revalidatePath("/", "layout");
   return { ok: `Saved.${picked ? ` Brand color set to match ${picked.name}.` : ""} The live website updates within about a minute.` };

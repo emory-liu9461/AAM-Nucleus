@@ -112,24 +112,26 @@ function presetFor(trade: string): Preset {
 
 export type PublicSite = ReturnType<typeof publicSite>;
 
-/** The Credence logo family (files in public/brand/credence and site/public/brand/credence). */
+/** The Archen logo family (files in public/brand/archen and site/public/brand/archen). */
 export const BRAND_LOGOS: { key: string; name: string; accent: string; trade: RegExp }[] = [
-  { key: "credence-painting", name: "Credence Painting", accent: "#0F8B8D", trade: /paint|stain|coating/i },
-  { key: "credence-cleaning", name: "Credence Cleaning", accent: "#2E9E5B", trade: /clean|janitor|maid/i },
-  { key: "credence-roofing", name: "Credence Roofing", accent: "#B5452F", trade: /roof/i },
-  { key: "credence-renovations", name: "Credence Renovations", accent: "#B8730A", trade: /remodel|renovat|kitchen|bath/i },
-  { key: "credence-concrete", name: "Credence Concrete", accent: "#5B6B7F", trade: /concrete|paving|masonry/i },
-  { key: "credence-landscaping", name: "Credence Landscaping", accent: "#4C8C2B", trade: /landscap|lawn|garden/i },
-  { key: "credence", name: "Credence (parent brand)", accent: "#14213D", trade: /$^/ },
+  { key: "archen-painting", name: "Archen Painting", accent: "#0F8B8D", trade: /paint|stain|coating/i },
+  { key: "archen-cleaning", name: "Archen Cleaning", accent: "#2E9E5B", trade: /clean|janitor|maid/i },
+  { key: "archen-roofing", name: "Archen Roofing", accent: "#B5452F", trade: /roof/i },
+  { key: "archen-renovations", name: "Archen Renovations", accent: "#B8730A", trade: /remodel|renovat|kitchen|bath/i },
+  { key: "archen-concrete", name: "Archen Concrete", accent: "#5B6B7F", trade: /concrete|paving|masonry/i },
+  { key: "archen-landscaping", name: "Archen Landscaping", accent: "#4C8C2B", trade: /landscap|lawn|garden/i },
+  { key: "archen-construction", name: "Archen Construction", accent: "#2F6DB5", trade: /construct|contract|build|general/i },
+  { key: "archen", name: "Archen (parent brand)", accent: "#14213D", trade: /$^/ },
 ];
 
-/** Chosen logo, or automatic: a business named "Credence…" gets the logo matching its trade. */
+/** Chosen logo, or automatic: a business named "Archen…" gets the logo matching its trade. */
 export function logoFor(b: Pick<Business, "name" | "trade" | "site">) {
-  const chosen = b.site?.logo;
+  // Logos saved under an earlier brand name (Credence, Astra) carry over to the matching Archen logo.
+  const chosen = b.site?.logo?.replace(/^(credence|astra)/, "archen");
   if (chosen === "none") return null;
   if (chosen && BRAND_LOGOS.some((l) => l.key === chosen)) return chosen;
-  if (!/^credence\b/i.test(b.name.trim())) return null;
-  return BRAND_LOGOS.find((l) => l.trade.test(b.trade) || l.trade.test(b.name))?.key ?? "credence";
+  if (!/^archen\b/i.test(b.name.trim())) return null;
+  return BRAND_LOGOS.find((l) => l.trade.test(b.trade) || l.trade.test(b.name))?.key ?? "archen";
 }
 
 /** Everything the public website needs, and nothing private. */
