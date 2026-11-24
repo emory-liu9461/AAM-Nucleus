@@ -13,6 +13,7 @@ import { sendBusinessSms } from "@/lib/sms";
 import { sendBusinessEmail } from "@/lib/email";
 import { toE164 } from "@/lib/twilio";
 import { normalizeSiteUrl, websiteBaseUrl } from "@/lib/app-settings";
+import { SOCIAL_CHANNELS, normalizeSocialUrl } from "@/lib/social";
 import { isValidTimezone } from "@/lib/availability";
 
 // Every action checks the signed-in user's access first. requireBusiness() 404s
@@ -278,7 +279,7 @@ export async function updateWebsiteSettings(slug: string, form: FormData) {
       allowedDomains: str(form, "allowedDomains"),
     })
     .where(eq(businesses.id, b.id));
-  revalidatePath(`/b/${slug}/website`);
+  revalidatePath(`/b/${slug}/social`);
 }
 
 export async function regenerateFormKey(slug: string) {
@@ -287,7 +288,7 @@ export async function regenerateFormKey(slug: string) {
     .update(businesses)
     .set({ formKey: sql`replace(gen_random_uuid()::text, '-', '')` })
     .where(eq(businesses.id, b.id));
-  revalidatePath(`/b/${slug}/website`);
+  revalidatePath(`/b/${slug}/social`);
 }
 
 /* ---------- public website content (owner) ---------- */
@@ -324,11 +325,11 @@ export async function updateSiteContent(slug: string, _: { error?: string; ok?: 
       return { name, city: city || undefined, text: text ?? "", rating: Number(rating) || 5 };
     }).filter((r) => r.name && r.text),
     financing: str(form, "financing") ?? undefined,
-    social: { facebook: str(form, "facebook") ?? undefined, instagram: str(form, "instagram") ?? undefined, google: str(form, "google") ?? undefined },
+    social: b.site?.social ?? {}, // edited on the Social tab
     analytics: { ga4: str(form, "ga4") ?? undefined, googleAds: str(form, "googleAds") ?? undefined, metaPixel: str(form, "metaPixel") ?? undefined },
   };
   await db.update(businesses).set({ domain, site }).where(eq(businesses.id, b.id));
-  revalidatePath(`/b/${slug}/website`, "layout");
+  revalidatePath(`/b/${slug}/social`, "layout");
   return { ok: "Saved. The live website updates within about a minute." };
 }
 
@@ -362,7 +363,7 @@ export async function updateAssistantSettings(slug: string, _: { error?: string;
     instructions: (str(form, "instructions") ?? "").slice(0, 4000) || undefined,
   };
   await db.update(businesses).set({ assistant }).where(eq(businesses.id, b.id));
-  revalidatePath(`/b/${slug}/website`, "layout");
+  revalidatePath(`/b/${slug}/social`, "layout");
   return { ok: assistant.enabled ? "Saved. The assistant is on." : "Saved. The assistant is off." };
 }
 
@@ -495,4 +496,24 @@ export async function testWebsiteLink(slug: string, _: { error?: string; ok?: st
   } catch {
     return { error: "Couldn't reach the website. Check the address and that its deployment is Ready in Vercel." };
   }
+}
+
+
+/* ---------- social channels (owner) ---------- */
+
+export async function updateSocialLinks(slug: string, _: { error?: string; ok?: string } | null, form: FormData) {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  const social: Record<string, string> = {};
+  const bad: string[] = [];
+  for (const ch of SOCIAL_CHANNELS) {
+    const raw = str(form, `social_${ch.key}`);
+    if (!raw) continue;
+    const url = normalizeSocialUrl(ch.key, raw);
+    if (url) social[ch.key] = url;
+    else bad.push(ch.name);
+  }
+  if (bad.length) return { error: `These don't look like ${bad.join(", ")} links. Copy the address from your profile page.` };
+  await db.update(businesses).set({ site: { ...(b.site ?? {}), social } }).where(eq(businesses.id, b.id));
+  revalidatePath(`/b/${slug}/social`, "layout");
+  return { ok: `Saved ${Object.keys(social).length} profile link${Object.keys(social).length === 1 ? "" : "s"}. They appear on your website within about a minute.` };
 }

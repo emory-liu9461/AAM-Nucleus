@@ -297,7 +297,7 @@ export type SiteContent = {
   services?: { name: string; summary?: string }[];
   reviews?: { name: string; city?: string; text: string; rating?: number }[];
   financing?: string;
-  social?: { facebook?: string; instagram?: string; google?: string };
+  social?: Record<string, string>; // channel key (google, facebook, instagram, tiktok…) -> profile URL
   analytics?: { ga4?: string; googleAds?: string; metaPixel?: string };
 };
 

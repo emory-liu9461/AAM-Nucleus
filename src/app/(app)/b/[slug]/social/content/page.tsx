@@ -16,7 +16,7 @@ export default async function SiteContentPage({ params }: { params: Promise<{ sl
     <div className="max-w-4xl space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <Link href={`/b/${b.slug}/website`} className="text-sm text-muted hover:text-ink">← Website</Link>
+          <Link href={`/b/${b.slug}/social`} className="text-sm text-muted hover:text-ink">← Social</Link>
           <h1 className="text-xl font-semibold">Website content</h1>
           <p className="text-sm text-muted">Anything left blank uses the grey example text, which comes from the business&apos;s trade.</p>
         </div>
@@ -36,7 +36,7 @@ export default async function SiteContentPage({ params }: { params: Promise<{ sl
         </section>
       ) : (
         <p className="card text-sm text-muted">
-          To preview the website here, enter your website project&apos;s address under <Link className="text-accent hover:underline" href={`/b/${b.slug}/website`}>Website → Link to your website project</Link>.
+          To preview the website here, enter your website project&apos;s address under <Link className="text-accent hover:underline" href={`/b/${b.slug}/social`}>Social → Link to your website project</Link>.
         </p>
       )}
 
@@ -84,15 +84,15 @@ export default async function SiteContentPage({ params }: { params: Promise<{ sl
           <p className="text-xs text-muted sm:col-span-2">Only use real reviews from real customers, with their permission.</p>
         </Card>
 
-        <Card title="Social and tracking (optional)">
-          <Field name="google" label="Google Business Profile link" value={c.social?.google} placeholder="https://g.page/…" />
-          <Field name="facebook" label="Facebook page" value={c.social?.facebook} placeholder="https://facebook.com/…" />
-          <Field name="instagram" label="Instagram" value={c.social?.instagram} placeholder="https://instagram.com/…" />
+        <Card title="Tracking (optional)">
+          <p className="text-sm text-muted sm:col-span-2">
+            Social media profile links are set on the <Link className="text-accent hover:underline" href={`/b/${b.slug}/social`}>Social</Link> tab.
+          </p>
           <Field name="ga4" label="Google Analytics ID" value={c.analytics?.ga4} placeholder="G-XXXXXXXXXX" />
           <Field name="googleAds" label="Google Ads ID" value={c.analytics?.googleAds} placeholder="AW-XXXXXXXXX" />
           <Field name="metaPixel" label="Meta (Facebook) Pixel ID" value={c.analytics?.metaPixel} placeholder="1234567890" />
         </Card>
-        <p className="text-sm text-muted">Business name, phone, email and brand color come from <Link className="text-accent hover:underline" href={`/b/${b.slug}/settings`}>Settings</Link>. The quote form uses the <Link className="text-accent hover:underline" href={`/b/${b.slug}/website`}>Website</Link> tab&apos;s form settings.</p>
+        <p className="text-sm text-muted">Business name, phone, email and brand color come from <Link className="text-accent hover:underline" href={`/b/${b.slug}/settings`}>Settings</Link>. The quote form uses the <Link className="text-accent hover:underline" href={`/b/${b.slug}/social`}>Social</Link> tab&apos;s form settings.</p>
       </ActionForm>
     </div>
   );

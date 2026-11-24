@@ -36,7 +36,7 @@ export type Site = {
     services: { name: string; slug: string; summary: string }[];
     reviews: { name: string; city?: string; text: string; rating: number }[];
     financing: string | null;
-    social: { facebook?: string; instagram?: string; google?: string };
+    social: Record<string, string>; // channel key -> profile URL (google, facebook, instagram, tiktok, …)
     analytics: { ga4?: string; googleAds?: string; metaPixel?: string };
   };
 };
@@ -63,3 +63,10 @@ export const siteUrl = (s: Site) => (s.business.domain ? `https://${s.business.d
 export const telHref = (phone: string | null) => (phone ? `tel:${phone.replace(/[^\d+]/g, "")}` : undefined);
 
 export const schemaType = (trade: string) => (/roof/i.test(trade) ? "RoofingContractor" : /plumb/i.test(trade) ? "Plumber" : /electric/i.test(trade) ? "Electrician" : "GeneralContractor");
+
+/** Display names for social profile links in the footer, in display order. */
+export const SOCIAL_NAMES: [string, string][] = [
+  ["google", "Google"], ["facebook", "Facebook"], ["instagram", "Instagram"], ["tiktok", "TikTok"], ["youtube", "YouTube"],
+  ["linkedin", "LinkedIn"], ["x", "X"], ["nextdoor", "Nextdoor"], ["pinterest", "Pinterest"], ["houzz", "Houzz"],
+  ["homestars", "HomeStars"], ["yelp", "Yelp"], ["angi", "Angi"],
+];

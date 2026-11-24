@@ -3,7 +3,7 @@ import { slugify } from "./format";
 
 /*
  * Default website content per trade, so a brand-new business gets a complete,
- * sensible site immediately. Anything filled in on the Website tab overrides it.
+ * sensible site immediately. Anything filled in on the Social tab overrides it.
  */
 
 type Preset = { services: { name: string; summary: string }[]; hero: string; sub: string; warranty: string };

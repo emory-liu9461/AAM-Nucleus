@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // The Website tab is now Social; keep old bookmarks working.
+  async redirects() {
+    return [{ source: "/b/:slug/website/:path*", destination: "/b/:slug/social/:path*", permanent: false }];
+  },
   async headers() {
     return [
       // The app itself can't be framed by other sites (prevents clickjacking)...

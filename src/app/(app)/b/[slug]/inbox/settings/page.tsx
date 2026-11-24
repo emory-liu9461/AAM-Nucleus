@@ -33,7 +33,7 @@ export default async function InboxSettings({ params }: { params: Promise<{ slug
         <p className="text-xs text-muted">
           These are set in Vercel → aam-nucleus → Settings → Environment Variables: <code>TWILIO_ACCOUNT_SID</code>, <code>TWILIO_AUTH_TOKEN</code>,{" "}
           <code>POSTMARK_SERVER_TOKEN</code>, <code>POSTMARK_INBOUND_TOKEN</code>, <code>ANTHROPIC_API_KEY</code>, and <code>APP_URL</code> (your Nucleus address, e.g. https://app.yourcompany.com).
-          The website chat is set up separately under Website → AI assistant.
+          The website chat is set up separately under Social → AI assistant.
         </p>
       </section>
 

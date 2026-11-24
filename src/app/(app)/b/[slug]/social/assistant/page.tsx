@@ -50,7 +50,7 @@ export default async function AssistantPage({ params }: { params: Promise<{ slug
     <div className="max-w-4xl space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <Link href={`/b/${b.slug}/website`} className="text-sm text-muted hover:text-ink">← Website</Link>
+          <Link href={`/b/${b.slug}/social`} className="text-sm text-muted hover:text-ink">← Social</Link>
           <h1 className="text-xl font-semibold">AI assistant</h1>
           <p className="text-sm text-muted">A chat on your website that answers questions and books site visits{s.offerCalls ? " and calls" : ""} into your Schedule.</p>
         </div>
@@ -66,7 +66,7 @@ export default async function AssistantPage({ params }: { params: Promise<{ slug
           </p>
         </div>
       )}
-      {!b.formEnabled && <div className="card text-sm text-muted">Website requests are paused on the Website tab, so the assistant is hidden too.</div>}
+      {!b.formEnabled && <div className="card text-sm text-muted">Website requests are paused on the Social tab, so the assistant is hidden too.</div>}
 
       <ActionForm action={updateAssistantSettings.bind(null, b.slug)} submit="Save assistant settings" className="space-y-5">
         <section className="card space-y-4">

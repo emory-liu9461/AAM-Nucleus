@@ -15,7 +15,7 @@ export function BusinessFields({ business }: { business?: Business }) {
       <label className="field">Email<input className="input" name="email" type="email" defaultValue={business?.email ?? ""} /></label>
       <label className="field sm:col-span-2">Other website (optional)
         <input className="input" name="website" defaultValue={business?.website ?? ""} placeholder="https://" />
-        <span className="font-normal">Only for your records, e.g. an old site. Your Nucleus website&apos;s address is set under Website → Edit website content.</span>
+        <span className="font-normal">Only for your records, e.g. an old site. Your Nucleus website&apos;s address is set under Social → Edit website content.</span>
       </label>
     </>
   );

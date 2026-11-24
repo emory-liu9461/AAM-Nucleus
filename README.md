@@ -17,7 +17,7 @@ A web app for running several construction businesses from one place: a combined
 | **Add business** | `/businesses/new`. Each business gets its own data, which rolls into the combined dashboard. You can archive a business to hide it without losing its data. |
 | **Team** (`/team`) | Individual logins (email + password) with roles, per-business access, password resets and deactivation. |
 | **Account** (`/account`) | Change your own name and password. |
-| **Website** (`/b/:slug/website`) | Connect each business's website: an embed code for a quote form, a shareable hosted form link, and a lead API for existing forms, Zapier or Make. Leads arrive in Leads with their source (Google, Facebook, etc.) worked out from ad and UTM tags. |
+| **Social** (`/b/:slug/social`, formerly Website) | The business's website (live link, content, AI chat), **social media and review sites** (Google Business Profile, Facebook, Instagram, TikTok, YouTube, LinkedIn, X, Nextdoor, Pinterest, Houzz, HomeStars, Yelp, Angi) with a profile link, a tracked quote link, and 30-day visits and leads for each, plus ways to connect another website (embed code, hosted form link, lead API). |
 
 ## Website lead capture
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import { and, desc, eq, isNotNull } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { regenerateFormKey, updateWebsiteSettings } from "@/app/actions";
 import { CopyField } from "@/components/CopyField";
@@ -8,12 +8,13 @@ import { fmtDate, label } from "@/lib/format";
 import { RATE_LIMIT } from "@/lib/intake";
 import { requireBusinessPage } from "@/lib/session";
 import { websiteBaseUrl } from "@/lib/app-settings";
-import { setWebsiteUrl, testWebsiteLink } from "@/app/actions";
+import { setWebsiteUrl, testWebsiteLink, updateSocialLinks } from "@/app/actions";
+import { SOCIAL_CHANNELS, trackedLink } from "@/lib/social";
 import { ActionForm } from "@/components/ActionForm";
 
 const { leads, contacts } = schema;
 
-export default async function WebsitePage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function SocialPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const { business: b } = await requireBusinessPage(slug, "manage_business");
   const h = await headers();
@@ -38,6 +39,21 @@ export default async function WebsitePage({ params }: { params: Promise<{ slug: 
   -H "Content-Type: application/json" \\
   -d '{"name":"Jane Smith","phone":"555-123-4567","email":"jane@example.com","service":"Roof repair","message":"Leak over the garage","utm_source":"google"}'`;
 
+  // Last 30 days per channel: visits (by tracked source) and new leads (by ad tag or lead source).
+  const since = new Date(Date.now() - 30 * 864e5).toISOString();
+  const [visitRows, leadRows] = await Promise.all([
+    db.select({ source: schema.siteVisits.source, n: sql<number>`count(distinct ${schema.siteVisits.sessionId})` }).from(schema.siteVisits)
+      .where(and(eq(schema.siteVisits.businessId, b.id), sql`${schema.siteVisits.createdAt} >= ${since}::timestamptz`)).groupBy(schema.siteVisits.source),
+    db.select({ source: sql<string>`lower(coalesce(${leads.attribution}->>'utmSource', ${leads.source}::text))`, n: sql<number>`count(*)` }).from(leads)
+      .where(and(eq(leads.businessId, b.id), sql`${leads.createdAt} >= ${since}::timestamptz`)).groupBy(sql`1`),
+  ]);
+  const visitsBy = Object.fromEntries(visitRows.map((r) => [r.source, Number(r.n)]));
+  const leadsBy = Object.fromEntries(leadRows.map((r) => [r.source, Number(r.n)]));
+  const social = b.site?.social ?? {};
+  // Where tracked links point: the website's quote page if there is one, else the hosted quote form.
+  const quoteBase = b.domain ? `https://${b.domain}/quote` : previewBase ? `${previewBase}/quote?site=${b.slug}` : formUrl;
+  const linked = SOCIAL_CHANNELS.filter((c) => social[c.key]);
+
   const recent = await db
     .select({ lead: leads, first: contacts.firstName, last: contacts.lastName })
     .from(leads)
@@ -50,11 +66,11 @@ export default async function WebsitePage({ params }: { params: Promise<{ slug: 
     <div className="max-w-4xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-xl font-semibold">Website lead capture</h1>
-          <p className="text-sm text-muted">Quote requests from your website arrive in Leads automatically, tagged with where they came from.</p>
+          <h1 className="text-xl font-semibold">Social</h1>
+          <p className="text-sm text-muted">Your website, social media and review sites. Every quote request lands in Leads, tagged with the channel it came from.</p>
         </div>
         <span className={`pill ${b.formEnabled ? "bg-green-500/15 text-green-700 dark:text-green-300" : "bg-gray-500/15 text-muted"}`}>
-          {b.formEnabled ? "Accepting requests" : "Paused"}
+          {b.formEnabled ? "Accepting quote requests" : "Quote requests paused"}
         </span>
       </div>
 
@@ -75,7 +91,7 @@ export default async function WebsitePage({ params }: { params: Promise<{ slug: 
               </p>
               <p className="text-xs">
                 Optional: give it its own address like yourbusiness.com. Enter the domain on{" "}
-                <Link className="text-accent hover:underline" href={`/b/${b.slug}/website/content`}>Edit website content</Link>, then add the same domain to the website project in Vercel.
+                <Link className="text-accent hover:underline" href={`/b/${b.slug}/social/content`}>Edit website content</Link>, then add the same domain to the website project in Vercel.
               </p>
             </div>
           ) : (
@@ -90,8 +106,8 @@ export default async function WebsitePage({ params }: { params: Promise<{ slug: 
           ) : (
             <span className="btn-ghost cursor-not-allowed opacity-60" title="Set a domain on Edit website content, or SITE_PREVIEW_URL in Vercel">Open website ↗</span>
           )}
-          <Link href={`/b/${b.slug}/website/content`} className="btn-ghost">Edit website content</Link>
-          <Link href={`/b/${b.slug}/website/assistant`} className="btn-ghost">AI assistant{b.assistant?.enabled ? " (on)" : ""}</Link>
+          <Link href={`/b/${b.slug}/social/content`} className="btn-ghost">Edit website content</Link>
+          <Link href={`/b/${b.slug}/social/assistant`} className="btn-ghost">AI assistant{b.assistant?.enabled ? " (on)" : ""}</Link>
         </div>
       </section>
 
@@ -111,6 +127,49 @@ export default async function WebsitePage({ params }: { params: Promise<{ slug: 
             <span className="text-sm text-muted">Check that the website shows {b.name} and sends quote requests here:</span>
           </ActionForm>
         )}
+      </section>
+
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold">Social media &amp; review sites</h2>
+            <p className="text-sm text-muted">
+              Add your profile links: they appear on your website and tell Google these profiles are yours. Share each channel&apos;s
+              tracked quote link in your bio and posts, so visits and leads are credited to that channel.
+            </p>
+          </div>
+          <span className="text-xs text-muted">{linked.length} of {SOCIAL_CHANNELS.length} linked · last 30 days</span>
+        </div>
+        <ActionForm action={updateSocialLinks.bind(null, b.slug)} submit="Save profile links" className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-2">
+            {SOCIAL_CHANNELS.map((ch) => {
+              const url = social[ch.key];
+              const visits = visitsBy[ch.key] ?? 0;
+              const fromLeads = leadsBy[ch.key] ?? 0;
+              return (
+                <div key={ch.key} className={`card space-y-2 ${url ? "" : "opacity-90"}`}>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">{ch.name}</span>
+                    {url ? <span className="pill bg-green-500/15 text-green-700 dark:text-green-300">Linked</span> : <span className="pill bg-gray-500/15 text-muted">Not linked</span>}
+                    {url && <a className="ml-auto text-xs text-accent hover:underline" href={url} target="_blank" rel="noreferrer">View profile ↗</a>}
+                  </div>
+                  <input className="input" name={`social_${ch.key}`} defaultValue={url ?? ""} placeholder={ch.placeholder} aria-label={`${ch.name} profile link`} />
+                  {url && (
+                    <>
+                      <div className="text-xs text-muted">Tracked quote link for {ch.name}:</div>
+                      <CopyField value={trackedLink(quoteBase, ch.key)} />
+                      <div className="flex gap-4 text-xs text-muted">
+                        <span><strong className="text-ink">{visits}</strong> website visits</span>
+                        <span><strong className="text-ink">{fromLeads}</strong> leads</span>
+                      </div>
+                    </>
+                  )}
+                  <p className="text-xs text-muted">{ch.tip}</p>
+                </div>
+              );
+            })}
+          </div>
+        </ActionForm>
       </section>
 
       <p className="text-sm text-muted">Already have a different website? Connect it to Nucleus with any of these:</p>

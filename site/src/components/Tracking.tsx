@@ -51,6 +51,15 @@ export function LeadConversion() {
   return null;
 }
 
+// Referring sites -> the channel names used in Nucleus (Social tab and dashboard).
+const REFERRERS: [RegExp, string][] = [
+  [/(^|\.)google\./, "google"], [/(^|\.)(facebook\.com|fb\.com|fb\.me)$/, "facebook"], [/(^|\.)instagram\.com$/, "instagram"],
+  [/(^|\.)tiktok\.com$/, "tiktok"], [/(^|\.)(youtube\.com|youtu\.be)$/, "youtube"], [/(^|\.)(linkedin\.com|lnkd\.in)$/, "linkedin"],
+  [/(^|\.)(x\.com|twitter\.com|t\.co)$/, "x"], [/(^|\.)nextdoor\./, "nextdoor"], [/(^|\.)(pinterest\.|pin\.it)/, "pinterest"],
+  [/(^|\.)houzz\./, "houzz"], [/(^|\.)homestars\.com$/, "homestars"], [/(^|\.)yelp\./, "yelp"], [/(^|\.)(angi\.com|homeadvisor\.com)$/, "angi"],
+  [/(^|\.)bing\./, "bing"],
+];
+
 /** Counts page views for the Nucleus dashboard. No cookies; a per-tab id groups one visit. */
 export function TrackVisit({ endpoint }: { endpoint: string }) {
   const pathname = usePathname();
@@ -67,7 +76,7 @@ export function TrackVisit({ endpoint }: { endpoint: string }) {
       let source = attr.utm_source || (attr.gclid ? "google" : attr.fbclid ? "facebook" : "");
       if (!source && attr.referrer) {
         const host = new URL(attr.referrer).hostname.replace(/^www\./, "");
-        source = /google\./.test(host) ? "google" : /facebook|instagram|fb\.com/.test(host) ? "facebook" : /bing\./.test(host) ? "bing" : host === location.hostname ? "direct" : host;
+        source = host === location.hostname ? "direct" : (REFERRERS.find(([re]) => re.test(host))?.[1] ?? host);
       }
       const body = JSON.stringify({ path: pathname, session, newSession, source: source || "direct" });
       if (!navigator.sendBeacon?.(endpoint, new Blob([body], { type: "text/plain" }))) fetch(endpoint, { method: "POST", body, keepalive: true }).catch(() => {});

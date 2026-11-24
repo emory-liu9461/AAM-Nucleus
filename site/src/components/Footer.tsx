@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Site } from "@/lib/site";
-import { telHref } from "@/lib/site";
+import { SOCIAL_NAMES, telHref } from "@/lib/site";
 import { Icon } from "./Icon";
 
 export function Footer({ site }: { site: Site }) {
@@ -34,11 +34,16 @@ export function Footer({ site }: { site: Site }) {
             <li><Link className="hover:text-ink" href="/quote">Get a free quote</Link></li>
             <li><Link className="hover:text-ink" href="/privacy">Privacy policy</Link></li>
           </ul>
-          <div className="mt-4 flex gap-3 text-sm">
-            {c.social.google && <a className="text-muted hover:text-brand" href={c.social.google} rel="noopener" target="_blank">Google</a>}
-            {c.social.facebook && <a className="text-muted hover:text-brand" href={c.social.facebook} rel="noopener" target="_blank">Facebook</a>}
-            {c.social.instagram && <a className="text-muted hover:text-brand" href={c.social.instagram} rel="noopener" target="_blank">Instagram</a>}
-          </div>
+          {SOCIAL_NAMES.some(([k]) => c.social[k]) && (
+            <div className="mt-4">
+              <div className="text-sm font-semibold">Find us on</div>
+              <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                {SOCIAL_NAMES.filter(([k]) => c.social[k]).map(([k, name]) => (
+                  <li key={k}><a className="text-muted hover:text-brand" href={c.social[k]} rel="noopener" target="_blank">{name}</a></li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
       <div className="wrap mt-10 border-t border-line pt-6 text-xs text-muted">© {year} {b.name}. All rights reserved.</div>

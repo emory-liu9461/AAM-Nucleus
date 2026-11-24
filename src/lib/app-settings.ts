@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 
-/** The website project's address (set on the Website tab, or SITE_PREVIEW_URL as a fallback). */
+/** The website project's address (set on the Social tab, or SITE_PREVIEW_URL as a fallback). */
 export async function websiteBaseUrl(): Promise<string | null> {
   const [row] = await db.select().from(schema.appSettings).where(eq(schema.appSettings.key, "website_url"));
   const v = row?.value || process.env.SITE_PREVIEW_URL || "";

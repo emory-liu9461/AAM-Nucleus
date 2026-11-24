@@ -4,7 +4,10 @@ import type { MarketingMetrics } from "@/lib/metrics";
 import { label, pct } from "@/lib/format";
 import { Kpi } from "./Kpi";
 
-const SOURCE_LABEL: Record<string, string> = { direct: "Direct / typed in", google: "Google", facebook: "Facebook & Instagram", bing: "Bing" };
+const SOURCE_LABEL: Record<string, string> = {
+  direct: "Direct / typed in", google: "Google", facebook: "Facebook", instagram: "Instagram", tiktok: "TikTok", youtube: "YouTube",
+  linkedin: "LinkedIn", x: "X (Twitter)", nextdoor: "Nextdoor", pinterest: "Pinterest", houzz: "Houzz", homestars: "HomeStars", yelp: "Yelp", angi: "Angi", bing: "Bing",
+};
 
 function Bars({ rows, empty }: { rows: [string, number][]; empty: string }) {
   const max = Math.max(1, ...rows.map(([, v]) => v));
