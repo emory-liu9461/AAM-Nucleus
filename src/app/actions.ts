@@ -7,8 +7,8 @@ import { z } from "zod";
 import { db, schema } from "@/db";
 import { dollarsToCents, slugify } from "@/lib/format";
 import { can, requireBusiness, requirePermission } from "@/lib/session";
-import { BRAND_LOGOS, normalizeDomain } from "@/lib/site-defaults";
-import type { AlertSettings, AssistantSettings, EmailSettings, PhoneSettings, ReviewSettings, SiteContent } from "@/db/schema";
+import { BRAND_LOGOS, normalizeDomain, pageSections, presetWarranty, toLines } from "@/lib/site-defaults";
+import type { AlertSettings, AssistantSettings, EmailSettings, PhoneSettings, ReviewSettings, SiteContent, SiteSectionKey, SiteSectionText } from "@/db/schema";
 import { alertSettings, notify } from "@/lib/alerts";
 import { reviewSettings, sendReviewRequest } from "@/lib/reviews";
 import { sendBusinessSms } from "@/lib/sms";
@@ -326,6 +326,7 @@ export async function updateSiteContent(slug: string, _: { error?: string; ok?: 
       return { name, city: city || undefined, text: text ?? "", rating: Number(rating) || 5 };
     }).filter((r) => r.name && r.text),
     financing: str(form, "financing") ?? undefined,
+    ...editableSections(b, form),
     social: b.site?.social ?? {}, // edited on the Social tab
     analytics: { ga4: str(form, "ga4") ?? undefined, googleAds: str(form, "googleAds") ?? undefined, metaPixel: str(form, "metaPixel") ?? undefined },
   };
@@ -334,6 +335,48 @@ export async function updateSiteContent(slug: string, _: { error?: string; ok?: 
   await db.update(businesses).set({ domain, site, ...(picked ? { color: picked.accent } : {}) }).where(eq(businesses.id, b.id));
   revalidatePath("/", "layout");
   return { ok: `Saved.${picked ? ` Brand color set to match ${picked.name}.` : ""} The live website updates within about a minute.` };
+}
+
+/**
+ * Trust points, "What we stand for", "How it works" and section headings. Anything left the
+ * same as what the editor showed for the defaults is saved as "automatic", so it keeps
+ * following the defaults (e.g. a changed warranty or licence number flows into the trust points).
+ */
+function editableSections(b: Pick<typeof businesses.$inferSelect, "name" | "trade" | "site">, form: FormData): Pick<SiteContent, "trustPoints" | "priorities" | "process" | "sections"> {
+  const old = b.site ?? {};
+  const shown = pageSections(b, { ...old, trustPoints: undefined, priorities: undefined, process: undefined, sections: undefined }, old.warranty || presetWarranty(b.trade));
+  const norm = (v: string) => v.split("\n").map((l) => l.trim()).filter(Boolean).join("\n");
+  const pairs = (k: string, dflt: { a: string; b?: string }[]) => {
+    const raw = norm(String(form.get(k) ?? ""));
+    if (!raw || raw === norm(toLines(dflt))) return undefined;
+    return raw.split("\n").slice(0, 12).map((l) => {
+      const [a, ...rest] = l.split("|");
+      return { a: a.trim().slice(0, 80), b: rest.join("|").trim().slice(0, 300) || undefined };
+    }).filter((x) => x.a);
+  };
+  // A customized list keeps up with a changed warranty (the line that showed the old one).
+  const oldWarranty = old.warranty || presetWarranty(b.trade);
+  const newWarranty = String(form.get("warranty") ?? "").trim() || presetWarranty(b.trade);
+  const trust = pairs("trustPoints", shown.trustPoints.map((t) => ({ a: t.label, b: t.detail })))?.map((x) => (x.b === oldWarranty ? { ...x, b: newWarranty } : x));
+  const pri = pairs("priorities", shown.priorities.map((t) => ({ a: t.title, b: t.text })));
+  const proc = pairs("process", shown.process.map((t) => ({ a: t.title, b: t.text })));
+  const sections: Partial<Record<SiteSectionKey, SiteSectionText>> = {};
+  for (const [k, d] of Object.entries(shown.sections) as [SiteSectionKey, Required<SiteSectionText>][]) {
+    const o: SiteSectionText = {};
+    if (form.get(`sec_${k}_show`) !== "on") o.show = false;
+    for (const f of ["eyebrow", "title", "intro"] as const) {
+      if (!form.has(`sec_${k}_${f}`)) continue;
+      const v = String(form.get(`sec_${k}_${f}`) ?? "").trim().slice(0, f === "intro" ? 400 : 120);
+      if (v !== d[f]) o[f] = v;
+    }
+    if (Object.keys(o).length) sections[k] = o;
+  }
+  return {
+    trustPoints: trust?.map((x) => ({ label: x.a, detail: x.b })),
+    priorities: pri?.map((x) => ({ title: x.a, text: x.b })),
+    process: proc?.map((x) => ({ title: x.a, text: x.b })),
+    sections: Object.keys(sections).length ? sections : undefined,
+  };
 }
 
 /* ---------- AI website assistant (owner) ---------- */

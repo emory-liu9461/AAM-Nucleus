@@ -1,4 +1,4 @@
-import type { Business, SiteContent } from "@/db/schema";
+import type { Business, SiteContent, SiteSectionKey, SiteSectionText } from "@/db/schema";
 import { slugify } from "./format";
 
 /*
@@ -112,6 +112,63 @@ function presetFor(trade: string): Preset {
 
 export type PublicSite = ReturnType<typeof publicSite>;
 
+export const presetWarranty = (trade: string) => presetFor(trade).warranty;
+
+/* ---------- editable page sections: defaults ---------- */
+
+export const SECTION_LABELS: Record<SiteSectionKey, string> = {
+  trust: "Trust points (under the top of the home page)",
+  services: "Services",
+  projects: "Recent projects (photos)",
+  process: "How it works",
+  reviews: "Reviews",
+  about: "About us",
+  priorities: "What we stand for",
+  cta: "Call to action (bottom of every page)",
+};
+
+export function defaultSections(b: Pick<Business, "name" | "trade">, c: SiteContent): Record<SiteSectionKey, Required<SiteSectionText>> {
+  const name = b.name.replace(/\.+$/, "");
+  const sec = (eyebrow: string, title: string, intro = "") => ({ show: true, eyebrow, title, intro });
+  return {
+    trust: sec("", ""),
+    services: sec("What we do", `${b.trade} services`, "Every job gets a clear written quote, a clean job site and work we stand behind."),
+    projects: sec("Our work", "Recent projects"),
+    process: sec("How it works", "Simple from first call to final walkthrough"),
+    reviews: sec("Reviews", "What our customers say"),
+    about: sec("About us", "Local, licensed and accountable"),
+    priorities: sec("", "What we stand for", `At ${name}, we pride ourselves on these, in this order:`),
+    cta: sec("", "Ready to get started?", `Free, no-obligation quotes. ${c.hours || "Mon–Fri 7am–6pm · Sat 8am–2pm"}.`),
+  };
+}
+
+export function defaultTrustPoints(c: SiteContent, warranty: string) {
+  return [
+    { label: c.insured ?? true ? "Licensed & insured" : "Licensed", detail: [c.license ? `License ${c.license}` : "Fully licensed", c.insured ?? true ? "insured for your protection" : ""].filter(Boolean).join(", ") },
+    { label: "2-week guarantee", detail: "Not satisfied? Tell us within 2 weeks and we'll make it right" },
+    { label: "Warranty", detail: warranty },
+    { label: "Fast response", detail: "Quick replies to every call, text and quote request" },
+    { label: "Clear communication", detail: "Schedules, updates and photos at every step" },
+    c.yearsInBusiness ? { label: `${c.yearsInBusiness}+ years`, detail: "Serving our neighbours" } : { label: "Free quotes", detail: "Clear, written estimates" },
+  ];
+}
+
+export const DEFAULT_PRIORITIES = [
+  { title: "Quality work", text: "Done right the first time, with careful prep and clean finishes. Not satisfied? Tell us within 2 weeks and we'll make it right." },
+  { title: "Transparency and service", text: "Clear quotes, honest answers, and updates with photos so you always know where things stand." },
+  { title: "On time and fairly priced", text: "We show up when we say we will and stick to the price we agreed." },
+];
+
+export const DEFAULT_PROCESS = [
+  { title: "Request a quote", text: "Tell us about your project online or by phone." },
+  { title: "Site visit", text: "We visit, measure and talk through your options." },
+  { title: "Clear estimate", text: "A written, itemized price, with no surprises." },
+  { title: "Quality work", text: "We do the job right, clean up, and stand behind it." },
+];
+
+/** Lines of "Title | text" <-> list items (used by the editor). */
+export const toLines = (list: { a: string; b?: string }[]) => list.map((x) => (x.b ? `${x.a} | ${x.b}` : x.a)).join("\n");
+
 /** The Arcus logo family (files in public/brand/arcus and site/public/brand/arcus). */
 export const BRAND_LOGOS: { key: string; name: string; accent: string; trade: RegExp }[] = [
   { key: "arcus-painting", name: "Arcus Painting", accent: "#0F8B8D", trade: /paint|stain|coating/i },
@@ -173,9 +230,29 @@ export function publicSite(b: Business) {
       services: services.map((s) => ({ name: s.name, slug: slugify(s.name), summary: s.summary || presetSummary(s.name) || "" })),
       reviews: (c.reviews ?? []).filter((r) => r.name && r.text).map((r) => ({ ...r, rating: Math.min(5, Math.max(1, r.rating ?? 5)) })),
       financing: c.financing || null,
+      ...pageSections(b, c, c.warranty || p.warranty),
       social: c.social ?? {},
       analytics: c.analytics ?? {},
     },
+  };
+}
+
+/** Editable sections, each falling back to its default. */
+export function pageSections(b: Pick<Business, "name" | "trade">, c: SiteContent, warranty: string) {
+  const defaults = defaultSections(b, c);
+  const sections = Object.fromEntries(
+    (Object.keys(defaults) as SiteSectionKey[]).map((k) => {
+      const o = c.sections?.[k] ?? {};
+      const d = defaults[k];
+      return [k, { show: o.show ?? true, eyebrow: o.eyebrow ?? d.eyebrow, title: o.title || d.title, intro: o.intro ?? d.intro }];
+    }),
+  ) as Record<SiteSectionKey, Required<SiteSectionText>>;
+  const clean = <T extends { detail?: string; text?: string }>(l: T[]) => l.filter(Boolean);
+  return {
+    trustPoints: c.trustPoints?.length ? clean(c.trustPoints).map((t) => ({ label: t.label, detail: t.detail ?? "" })) : defaultTrustPoints(c, warranty),
+    priorities: c.priorities?.length ? c.priorities.map((t) => ({ title: t.title, text: t.text ?? "" })) : DEFAULT_PRIORITIES,
+    process: c.process?.length ? c.process.map((t) => ({ title: t.title, text: t.text ?? "" })) : DEFAULT_PROCESS,
+    sections,
   };
 }
 

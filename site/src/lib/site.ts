@@ -11,6 +11,14 @@ import { notFound } from "next/navigation";
 
 export type Photo = { id: string; caption: string | null; kind: "before" | "after" | "photo"; service: string | null; area: string | null; width: number | null; height: number | null };
 
+export type SectionKey = "trust" | "services" | "projects" | "process" | "reviews" | "about" | "priorities" | "cta";
+export type SectionText = { show: boolean; eyebrow: string; title: string; intro: string };
+
+/** A page section's wording and whether it's shown, with a fallback for an older Nucleus. */
+export function section(s: Site, key: SectionKey, fallback: Omit<SectionText, "show">): SectionText {
+  return s.content.sections?.[key] ?? { show: true, ...fallback };
+}
+
 export type Site = {
   business: {
     name: string;
@@ -39,6 +47,11 @@ export type Site = {
     services: { name: string; slug: string; summary: string }[];
     reviews: { name: string; city?: string; text: string; rating: number }[];
     financing: string | null;
+    // Editable in Nucleus (Social → Website content → Page sections). Optional so an older Nucleus still works.
+    trustPoints?: { label: string; detail: string }[];
+    priorities?: { title: string; text: string }[];
+    process?: { title: string; text: string }[];
+    sections?: Partial<Record<SectionKey, SectionText>>;
     social: Record<string, string>; // channel key -> profile URL (google, facebook, instagram, tiktok, …)
     analytics: { ga4?: string; googleAds?: string; metaPixel?: string };
   };

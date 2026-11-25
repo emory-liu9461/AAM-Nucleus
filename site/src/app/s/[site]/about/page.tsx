@@ -21,7 +21,7 @@ export default async function About({ params }: Props) {
         <div className="wrap grid gap-10 lg:grid-cols-[1fr_380px]">
           <div className="space-y-8">
             <div className="prose-site text-lg">{c.about.split(/\n+/).map((p, i) => <p key={i}>{p}</p>)}</div>
-            <Priorities name={s.business.name} />
+            <Priorities site={s} />
           </div>
           <ul className="space-y-3">
             {trustPoints(s).map((t) => (
@@ -38,7 +38,7 @@ export default async function About({ params }: Props) {
         </div>
         {c.serviceAreas.length > 0 && <div className="wrap mt-12"><h2 className="text-xl font-bold">Areas we serve</h2><div className="mt-4"><Areas site={s} /></div></div>}
       </section>
-      <Process />
+      <Process site={s} />
       <CtaBand site={s} />
     </>
   );

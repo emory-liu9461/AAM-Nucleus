@@ -370,9 +370,17 @@ export type SiteContent = {
   services?: { name: string; summary?: string }[];
   reviews?: { name: string; city?: string; text: string; rating?: number }[];
   financing?: string;
+  // Editable page sections (empty = the defaults in src/lib/site-defaults.ts).
+  trustPoints?: { label: string; detail?: string }[];
+  priorities?: { title: string; text?: string }[];
+  process?: { title: string; text?: string }[];
+  sections?: Partial<Record<SiteSectionKey, SiteSectionText>>;
   social?: Record<string, string>; // channel key (google, facebook, instagram, tiktok…) -> profile URL
   analytics?: { ga4?: string; googleAds?: string; metaPixel?: string };
 };
+
+export type SiteSectionKey = "trust" | "services" | "projects" | "process" | "reviews" | "about" | "priorities" | "cta";
+export type SiteSectionText = { show?: boolean; eyebrow?: string; title?: string; intro?: string };
 
 export type Intake = {
   marketingConsent?: string; // "yes" = ticked "send me offers and tips"

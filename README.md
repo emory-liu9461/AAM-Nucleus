@@ -91,6 +91,10 @@ Daily jobs: `/api/cron/daily` (Vercel Cron, `CRON_SECRET`) syncs social stats an
 - **Personal calendar feed:** each person has a private link (`/api/public/calendar/<token>.ics`) to subscribe to once in Google Calendar, Outlook or Apple Calendar, so all their work appears and stays up to date. Copy it, use the Add to Google/Outlook buttons, or email it to them; **Make a new link** retires the old one.
 - Times use the business time zone (Settings for the AI assistant's booking hours). Calendar replies ("Accepted: …") from crew are kept out of the Inbox.
 
+## Website page sections
+
+Social → Edit website content → **Page sections**: show or hide each part of the home page (trust points, services, recent projects, how it works, reviews, about, what we stand for, call to action) and edit its small label, heading and intro. Trust points, "What we stand for" and "How it works" are lists (`Title | description`, one per line); trust point icons are picked from the wording. Anything left as shown keeps following the defaults (e.g. a new warranty or licence number), and clearing a heading or list goes back to the default.
+
 ## Customer workflow
 
 **Customer workflow** tab (each business): what customers hear from you, from booking to review.

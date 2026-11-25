@@ -1,40 +1,57 @@
 import Link from "next/link";
 import type { Site } from "@/lib/site";
+import { section } from "@/lib/site";
 import { nucleusUrl, telHref } from "@/lib/site";
 import { Icon, Stars } from "./Icon";
 import { QuoteForm } from "./QuoteForm";
 
 export const endpointFor = (s: Site) => (s.business.formKey ? `${nucleusUrl()}/api/public/leads/${s.business.formKey}` : null);
 
-export function trustPoints(s: Site) {
-  const c = s.content;
-  return [
-    { icon: "badge", label: c.insured ? "Licensed & insured" : "Licensed", detail: [c.license ? `License ${c.license}` : "Fully licensed", c.insured ? "insured for your protection" : ""].filter(Boolean).join(", ") },
-    { icon: "shield", label: "2-week guarantee", detail: "Not satisfied? Tell us within 2 weeks and we'll make it right" },
-    { icon: "check", label: "Warranty", detail: c.warranty },
-    { icon: "bolt", label: "Fast response", detail: "Quick replies to every call, text and quote request" },
-    { icon: "chat", label: "Clear communication", detail: "Schedules, updates and photos at every step" },
-    c.yearsInBusiness ? { icon: "calendar", label: `${c.yearsInBusiness}+ years`, detail: "Serving our neighbors" } : { icon: "doc", label: "Free quotes", detail: "Clear, written estimates" },
-  ].filter(Boolean) as { icon: string; label: string; detail: string }[];
+/** Icon for a trust point, from its wording. */
+function trustIcon(label: string) {
+  const l = label.toLowerCase();
+  if (/licen/.test(l)) return "badge";
+  if (/insur|guarant|protect|safe/.test(l)) return "shield";
+  if (/fast|quick|response|same.day|24/.test(l)) return "bolt";
+  if (/communic|update|transparen|contact/.test(l)) return "chat";
+  if (/year|since|experience/.test(l)) return "calendar";
+  if (/quote|estimate/.test(l)) return "doc";
+  if (/price|financ|cost/.test(l)) return "dollar";
+  if (/local|home|famil/.test(l)) return "home";
+  if (/review|rated|star/.test(l)) return "star";
+  return "check";
 }
 
-/** What the business puts first, in order (shown on the home and About pages). */
-export const PRIORITIES = [
-  { title: "Quality work", text: "Done right the first time, with careful prep and clean finishes. Not satisfied? Tell us within 2 weeks and we'll make it right." },
-  { title: "Transparency and service", text: "Clear quotes, honest answers, and updates with photos so you always know where things stand." },
+export function trustPoints(s: Site) {
+  const c = s.content;
+  const list = c.trustPoints ?? [
+    { label: c.insured ? "Licensed & insured" : "Licensed", detail: c.license ? `License ${c.license}` : "Fully licensed" },
+    { label: "Warranty", detail: c.warranty },
+    c.yearsInBusiness ? { label: `${c.yearsInBusiness}+ years`, detail: "Serving our neighbors" } : { label: "Free quotes", detail: "Clear, written estimates" },
+  ];
+  return list.map((t) => ({ icon: trustIcon(t.label), label: t.label, detail: t.detail }));
+}
+
+const DEFAULT_PRIORITIES = [
+  { title: "Quality work", text: "Done right the first time, with careful prep and clean finishes." },
+  { title: "Transparency and service", text: "Clear quotes, honest answers, and updates so you always know where things stand." },
   { title: "On time and fairly priced", text: "We show up when we say we will and stick to the price we agreed." },
 ];
 
-export function Priorities({ name }: { name: string }) {
+/** What the business puts first, in order (home and About pages). */
+export function Priorities({ site }: { site: Site }) {
+  const sec = section(site, "priorities", { eyebrow: "", title: "What we stand for", intro: `At ${site.business.name.replace(/\.+$/, "")}, we pride ourselves on these, in this order:` });
+  const list = site.content.priorities ?? DEFAULT_PRIORITIES;
+  if (!sec.show || !list.length) return null;
   return (
     <div className="rounded-xl border border-line p-6">
-      <h3 className="font-bold">What we stand for</h3>
-      <p className="mt-1 text-sm text-muted">At {name.replace(/\.+$/, "")}, we pride ourselves on these, in this order:</p>
+      <h3 className="font-bold">{sec.title}</h3>
+      {sec.intro && <p className="mt-1 text-sm text-muted">{sec.intro}</p>}
       <ol className="mt-4 space-y-4">
-        {PRIORITIES.map((p, i) => (
-          <li key={p.title} className="flex gap-3">
+        {list.map((p, i) => (
+          <li key={i} className="flex gap-3">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">{i + 1}</span>
-            <div><div className="font-semibold">{p.title}</div><div className="text-sm text-muted">{p.text}</div></div>
+            <div><div className="font-semibold">{p.title}</div>{p.text && <div className="text-sm text-muted">{p.text}</div>}</div>
           </li>
         ))}
       </ol>
@@ -56,11 +73,11 @@ export function Hero({ site }: { site: Site }) {
             <Link href="/quote" className="btn-primary text-base">Get a free quote <Icon name="arrow" className="h-4 w-4" /></Link>
             {b.phone && <a href={telHref(b.phone)} className="btn-outline text-base"><Icon name="phone" className="h-4 w-4" />{b.phone}</a>}
           </div>
-          <ul className="mt-8 grid max-w-lg grid-cols-2 gap-3 text-sm font-medium">
+          {section(site, "trust", { eyebrow: "", title: "", intro: "" }).show && <ul className="mt-8 grid max-w-lg grid-cols-2 gap-3 text-sm font-medium">
             {trustPoints(site).map((t) => (
               <li key={t.label} className="flex items-center gap-2"><Icon name={t.icon} className="h-5 w-5 text-brand" />{t.label}</li>
             ))}
-          </ul>
+          </ul>}
         </div>
         <div className="rounded-2xl border border-line bg-white p-6 shadow-xl shadow-slate-900/5" id="quote">
           <QuoteForm businessName={site.business.name} endpoint={endpointFor(site)} services={c.services.map((s) => s.name)} compact heading="Request your free quote" />
@@ -90,6 +107,7 @@ export function PageHero({ eyebrow, title, intro }: { eyebrow?: string; title: s
 }
 
 export function TrustBar({ site }: { site: Site }) {
+  if (!section(site, "trust", { eyebrow: "", title: "", intro: "" }).show) return null;
   return (
     <section className="border-b border-line">
       <div className="wrap grid grid-cols-2 gap-6 py-8 lg:grid-cols-3">
@@ -120,27 +138,33 @@ export function ServicesGrid({ site, limit }: { site: Site; limit?: number }) {
   );
 }
 
-export function Process() {
-  const steps = [
-    { icon: "doc", title: "Request a quote", text: "Tell us about your project online or by phone." },
-    { icon: "calendar", title: "Site visit", text: "We visit, measure and talk through your options." },
-    { icon: "dollar", title: "Clear estimate", text: "A written, itemized price, with no surprises." },
-    { icon: "check", title: "Quality work", text: "We do the job right, clean up, and stand behind it." },
-  ];
+const DEFAULT_PROCESS = [
+  { title: "Request a quote", text: "Tell us about your project online or by phone." },
+  { title: "Site visit", text: "We visit, measure and talk through your options." },
+  { title: "Clear estimate", text: "A written, itemized price, with no surprises." },
+  { title: "Quality work", text: "We do the job right, clean up, and stand behind it." },
+];
+const STEP_ICONS = ["doc", "calendar", "dollar", "check", "wrench", "home", "star", "shield"];
+
+export function Process({ site }: { site: Site }) {
+  const sec = section(site, "process", { eyebrow: "How it works", title: "Simple from first call to final walkthrough", intro: "" });
+  const steps = site.content.process ?? DEFAULT_PROCESS;
+  if (!sec.show || !steps.length) return null;
   return (
     <section className="bg-surface py-16 sm:py-20">
       <div className="wrap">
-        <p className="eyebrow">How it works</p>
-        <h2 className="h2 mt-2">Simple from first call to final walkthrough</h2>
-        <ol className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {sec.eyebrow && <p className="eyebrow">{sec.eyebrow}</p>}
+        <h2 className="h2 mt-2">{sec.title}</h2>
+        {sec.intro && <p className="lead mt-3 max-w-2xl">{sec.intro}</p>}
+        <ol className={`mt-10 grid gap-6 sm:grid-cols-2 ${steps.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4"}`}>
           {steps.map((s, i) => (
-            <li key={s.title} className="rounded-xl border border-line bg-white p-6">
+            <li key={i} className="rounded-xl border border-line bg-white p-6">
               <div className="flex items-center gap-3">
                 <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">{i + 1}</span>
-                <Icon name={s.icon} className="h-5 w-5 text-brand" />
+                <Icon name={STEP_ICONS[i % STEP_ICONS.length]} className="h-5 w-5 text-brand" />
               </div>
               <h3 className="mt-4 font-bold">{s.title}</h3>
-              <p className="mt-1 text-sm text-muted">{s.text}</p>
+              {s.text && <p className="mt-1 text-sm text-muted">{s.text}</p>}
             </li>
           ))}
         </ol>
@@ -182,12 +206,14 @@ export function Areas({ site }: { site: Site }) {
 
 export function CtaBand({ site, title }: { site: Site; title?: string }) {
   const b = site.business;
+  const sec = section(site, "cta", { eyebrow: "", title: "Ready to get started?", intro: `Free, no-obligation quotes. ${site.content.hours}.` });
+  if (!sec.show) return null;
   return (
     <section className="bg-brand">
       <div className="wrap flex flex-col items-start justify-between gap-6 py-12 text-white md:flex-row md:items-center">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">{title ?? "Ready to get started?"}</h2>
-          <p className="mt-2 text-white/85">Free, no-obligation quotes. {site.content.hours}.</p>
+          <h2 className="text-3xl font-bold tracking-tight">{title ?? sec.title}</h2>
+          {sec.intro && <p className="mt-2 text-white/85">{sec.intro}</p>}
         </div>
         <div className="flex flex-wrap gap-3">
           <Link href="/quote" className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-3 font-semibold text-brand-dark hover:bg-white/90">Get a free quote</Link>

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { updateSiteContent } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { requireBusinessPage } from "@/lib/session";
-import { BRAND_LOGOS, logoFor, publicSite } from "@/lib/site-defaults";
+import { BRAND_LOGOS, SECTION_LABELS, logoFor, publicSite, toLines } from "@/lib/site-defaults";
+import type { SiteSectionKey } from "@/db/schema";
 import { websiteBaseUrl } from "@/lib/app-settings";
 
 export default async function SiteContentPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -98,6 +99,33 @@ export default async function SiteContentPage({ params }: { params: Promise<{ sl
           <Area name="financing" label="Financing (optional; adds a Financing section)" rows={2} value={c.financing} placeholder="Flexible financing available, with low monthly payments on approved credit." />
         </Card>
 
+        <Card title="Page sections">
+          <p className="text-sm text-muted sm:col-span-2">
+            Show or hide each part of the home page and change its wording. Lists are one item per line, as <span className="font-mono">Title | description</span>.
+            Clear a heading to go back to the default. Text left as it is keeps following the defaults (for example, your warranty and licence above).
+          </p>
+          {(Object.keys(SECTION_LABELS) as SiteSectionKey[]).map((k) => {
+            const sec = d.sections[k];
+            return (
+              <fieldset key={k} className="space-y-2 rounded-lg border border-line p-3 sm:col-span-2">
+                <legend className="px-1 text-sm font-semibold">{SECTION_LABELS[k]}</legend>
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" name={`sec_${k}_show`} defaultChecked={sec.show} /> Show on the website</label>
+                {k !== "trust" && (
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {!["priorities", "cta"].includes(k) && <label className="field">Small label above<input className="input" name={`sec_${k}_eyebrow`} defaultValue={sec.eyebrow} /></label>}
+                    <label className={`field ${["priorities", "cta"].includes(k) ? "sm:col-span-3" : "sm:col-span-2"}`}>Heading<input className="input" name={`sec_${k}_title`} defaultValue={sec.title} /></label>
+                    {k !== "about" && <label className="field sm:col-span-3">{k === "cta" ? "Text" : "Intro line"}<input className="input" name={`sec_${k}_intro`} defaultValue={sec.intro} /></label>}
+                  </div>
+                )}
+                {k === "trust" && <ListArea name="trustPoints" label="Trust points: Label | short detail (6 fit best)" value={toLines(d.trustPoints.map((t) => ({ a: t.label, b: t.detail })))} />}
+                {k === "priorities" && <ListArea name="priorities" label="In order: Title | description" value={toLines(d.priorities.map((t) => ({ a: t.title, b: t.text })))} />}
+                {k === "process" && <ListArea name="process" label="Steps: Title | description (4 fit best)" value={toLines(d.process.map((t) => ({ a: t.title, b: t.text })))} />}
+                {k === "about" && <p className="text-xs text-muted">The About text itself is under &ldquo;Why choose you&rdquo;.</p>}
+              </fieldset>
+            );
+          })}
+        </Card>
+
         <Card title="Reviews">
           <Area name="reviews" label="One per line: Name | City | Review | Stars (1–5)" rows={5}
             value={(c.reviews ?? []).map((r) => [r.name, r.city ?? "", r.text, r.rating ?? 5].join(" | ")).join("\n")}
@@ -131,6 +159,13 @@ function Field({ name, label, value, placeholder, wide }: { name: string; label:
   return (
     <label className={`field ${wide ? "sm:col-span-2" : ""}`}>{label}
       <input className="input" name={name} defaultValue={value ?? ""} placeholder={placeholder} />
+    </label>
+  );
+}
+function ListArea({ name, label, value }: { name: string; label: string; value: string }) {
+  return (
+    <label className="field">{label}
+      <textarea className="input font-normal" name={name} rows={Math.max(3, value.split("\n").length + 1)} defaultValue={value} />
     </label>
   );
 }
