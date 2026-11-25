@@ -1,12 +1,15 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { sendReviewRequestNow, updateJob } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { can, requireBusinessPage } from "@/lib/session";
 import { fmtDate, label, money as fmtMoney, pct } from "@/lib/format";
 import { Badge } from "@/components/Badge";
+import { WorkForm } from "@/components/WorkForm";
+import { businessTz, whenLabel } from "@/lib/calendar";
+import { crewFor } from "@/lib/staff";
 
-const { jobs, contacts, invoices, payments, jobStatus } = schema;
+const { jobs, contacts, invoices, payments, jobStatus, scheduleEvents, staffMembers } = schema;
 
 export default async function JobsPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ view?: string }> }) {
   const [{ slug }, { view = "active" }] = await Promise.all([params, searchParams]);
@@ -27,6 +30,15 @@ export default async function JobsPage({ params, searchParams }: { params: Promi
     .where(and(eq(jobs.businessId, b.id), filter))
     .orderBy(desc(jobs.startDate))
     .limit(300);
+  const tz = businessTz(b);
+  const ids = rows.map((r) => r.job.id);
+  const [events, staff] = await Promise.all([
+    ids.length ? db.select().from(scheduleEvents).where(inArray(scheduleEvents.jobId, ids)).orderBy(asc(scheduleEvents.startsAt)) : Promise.resolve([]),
+    db.select().from(staffMembers).where(eq(staffMembers.businessId, b.id)).orderBy(asc(staffMembers.name)),
+  ]);
+  const crews = await crewFor(events.map((e) => e.id));
+  const openJobs = rows.filter((r) => ["scheduled", "in_progress"].includes(r.job.status)).map((r) => ({ id: r.job.id, name: r.job.name }));
+  const now = new Date();
 
   return (
     <div className="space-y-4">
@@ -48,6 +60,7 @@ export default async function JobsPage({ params, searchParams }: { params: Promi
                 {money && <span className="text-sm">{fmtMoney(job.contractValue)}</span>}
                 {money && <span className="text-xs text-muted">Billed {fmtMoney(Number(invoiced))} · Paid {fmtMoney(Number(paid))} · Margin {pct(margin)}{job.actualCost ? "" : " (est.)"}</span>}
                 {!money && (job.startDate || job.endDate) && <span className="text-xs text-muted">{job.startDate ?? "?"} → {job.endDate ?? "?"}</span>}
+                <JobCrewSummary events={events.filter((e) => e.jobId === job.id)} crews={crews} now={now} tz={tz} />
               </summary>
               <form action={updateJob.bind(null, b.slug, job.id)} className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-7">
                 <label className="field">Status
@@ -62,11 +75,47 @@ export default async function JobsPage({ params, searchParams }: { params: Promi
                     <label className="field">Actual cost ($)<input className="input" name="actualCost" defaultValue={job.actualCost / 100} /></label>
                   </>
                 )}
-                <label className="field">Start<input className="input" type="date" name="startDate" defaultValue={job.startDate ?? ""} /></label>
-                <label className="field">End<input className="input" type="date" name="endDate" defaultValue={job.endDate ?? ""} /></label>
+                <label className="field">Start<input className="input" type="date" name="startDate" defaultValue={job.startDate ?? ""} title="Set automatically from the schedule once work is assigned" /></label>
+                <label className="field">End<input className="input" type="date" name="endDate" defaultValue={job.endDate ?? ""} title="Set automatically from the schedule once work is assigned" /></label>
                 <div className="flex items-end"><button className="btn w-full">Save</button></div>
               </form>
               {job.address && <p className="mt-2 text-xs text-muted">Site: {job.address}</p>}
+              <div className="mt-4 space-y-2 border-t border-line pt-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm font-medium">Schedule and crew</span>
+                  <span className="text-xs text-muted">The job&apos;s start and end dates follow its schedule.</span>
+                </div>
+                {events.filter((e) => e.jobId === job.id).length === 0 && <p className="text-sm text-muted">Nothing scheduled yet.</p>}
+                <ul className="space-y-2">
+                  {events.filter((e) => e.jobId === job.id).map((e) => {
+                    const crew = crews.get(e.id) ?? [];
+                    return (
+                      <li key={e.id} className={`rounded-lg border border-line p-2 text-sm ${e.endsAt < now ? "opacity-60" : ""}`}>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-medium">{whenLabel(e, tz)}{e.title !== job.name ? <span className="font-normal text-muted"> · {e.title}</span> : null}</span>
+                          <a className="text-xs text-accent hover:underline" href={`/b/${b.slug}/staff?edit=${e.id}#edit`}>Change time or crew</a>
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-1.5 text-xs">
+                          {crew.length === 0 && <span className="text-muted">No crew assigned</span>}
+                          {crew.map((c) => (
+                            <span key={c.staffId} className="inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5" title={c.inviteError ?? (c.invitedAt ? "Calendar invite sent" : undefined)}>
+                              <span className="h-2 w-2 rounded-full" style={{ background: c.color }} />{c.name}{c.role ? ` · ${c.role}` : ""}{c.inviteError ? " ⚠" : c.invitedAt ? " ✓" : ""}
+                            </span>
+                          ))}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {["scheduled", "in_progress"].includes(job.status) && (
+                  <details className="rounded-lg border border-line p-3">
+                    <summary className="cursor-pointer text-sm font-semibold">+ Assign work</summary>
+                    <div className="mt-3">
+                      <WorkForm slug={b.slug} tz={tz} jobs={openJobs} staff={staff} defaultJobId={job.id} />
+                    </div>
+                  </details>
+                )}
+              </div>
               {job.status === "completed" && (
                 <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3 text-sm">
                   <span className="font-medium">Review</span>
@@ -84,4 +133,12 @@ export default async function JobsPage({ params, searchParams }: { params: Promi
       </div>
     </div>
   );
+}
+
+/** In the collapsed row: the next visit and how many people are on it. */
+function JobCrewSummary({ events, crews, now, tz }: { events: (typeof schema.scheduleEvents.$inferSelect)[]; crews: Map<string, { name: string }[]>; now: Date; tz: string }) {
+  const next = events.find((e) => e.endsAt > now);
+  if (!next) return null;
+  const crew = crews.get(next.id) ?? [];
+  return <span className="text-xs text-muted">Next: {next.startsAt.toLocaleDateString("en-US", { timeZone: tz, month: "short", day: "numeric" })} · {crew.length ? `${crew.length} crew` : "no crew yet"}</span>;
 }

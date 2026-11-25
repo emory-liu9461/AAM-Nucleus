@@ -15,6 +15,7 @@ export function WorkForm({
   event,
   crew = [],
   defaultDate,
+  defaultJobId,
 }: {
   slug: string;
   tz: string;
@@ -23,15 +24,16 @@ export function WorkForm({
   event?: ScheduleEvent;
   crew?: CrewRow[];
   defaultDate?: string;
+  defaultJobId?: string;
 }) {
   const first = event ? localDay(event.startsAt, tz) : defaultDate;
   const rows = Math.max(CREW_ROWS, crew.length + 2);
   const people = staff.filter((s) => s.active || crew.some((c) => c.staffId === s.id));
-  const id = event?.id ?? "new";
+  const id = event?.id ?? defaultJobId ?? "new";
   return (
     <ActionForm action={saveWork.bind(null, slug, event?.id ?? null)} submit={event ? "Save changes" : "Schedule and send invites"} pendingText="Saving and sending invites…" resetOnSuccess={!event} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <label className="field lg:col-span-2">Job
-        <select className="input" name="jobId" defaultValue={event?.jobId ?? ""}>
+        <select className="input" name="jobId" defaultValue={event?.jobId ?? defaultJobId ?? ""}>
           <option value="">No job (e.g. estimate, errand)</option>
           {jobs.map((j) => <option key={j.id} value={j.id}>{j.name}</option>)}
         </select>

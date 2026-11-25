@@ -21,6 +21,7 @@ import { findYouTubeChannel } from "@/lib/social-sync/youtube";
 import { saveStats } from "@/lib/social-sync/store";
 import { isValidTimezone } from "@/lib/availability";
 import { cancelCrewInvites } from "@/lib/staff";
+import { syncJobDates } from "@/lib/jobs";
 import { sendCompleted, sendWelcome, workflowSettings } from "@/lib/workflow";
 
 // Every action checks the signed-in user's access first. requireBusiness() 404s
@@ -257,7 +258,8 @@ export async function voidInvoice(slug: string, invoiceId: string) {
 export async function deleteEvent(slug: string, eventId: string) {
   const { business: b } = await requireBusiness(slug);
   await cancelCrewInvites(b, eventId); // anyone on it gets a cancellation
-  await db.delete(scheduleEvents).where(and(eq(scheduleEvents.id, eventId), eq(scheduleEvents.businessId, b.id)));
+  const [gone] = await db.delete(scheduleEvents).where(and(eq(scheduleEvents.id, eventId), eq(scheduleEvents.businessId, b.id))).returning({ jobId: scheduleEvents.jobId });
+  await syncJobDates(b, gone?.jobId); // the job's dates follow what's left on its schedule
   revalidatePath(`/b/${slug}`, "layout");
   revalidatePath("/");
 }

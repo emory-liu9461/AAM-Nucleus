@@ -4,6 +4,7 @@ import { safeEqual } from "@/lib/auth";
 import { sendReviewReminders } from "@/lib/reviews";
 import { syncBusinessSocial } from "@/lib/social-sync";
 import { sendReminders } from "@/lib/workflow";
+import { advanceStartedJobs } from "@/lib/jobs";
 
 /* Daily jobs (Vercel Cron, see vercel.json): social stats sync, review reminders and customer "see you tomorrow" reminders. */
 export const maxDuration = 300;
@@ -18,5 +19,6 @@ export async function GET(req: Request) {
   for (const b of list) social[b.id] = await syncBusinessSocial(b);
   const reviews = await sendReviewReminders();
   const customerReminders = await sendReminders();
-  return Response.json({ ok: true, social, reviews, customerReminders });
+  const jobsStarted = await advanceStartedJobs();
+  return Response.json({ ok: true, social, reviews, customerReminders, jobsStarted });
 }

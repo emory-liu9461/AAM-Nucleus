@@ -2,6 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { NavLink } from "@/components/NavLink";
 import { can, requireBusiness, type Permission } from "@/lib/session";
+import { advanceStartedJobs } from "@/lib/jobs";
 
 const TABS: [string, string, Permission | null][] = [
   ["", "Dashboard", "view_financials"],
@@ -21,6 +22,7 @@ export default async function BusinessLayout({ children, params }: { children: R
   const { slug } = await params;
   const { business: b, user } = await requireBusiness(slug);
   const base = `/b/${b.slug}`;
+  await advanceStartedJobs(b.id); // jobs whose scheduled work has started -> In progress
   const [{ n }] = await db
     .select({ n: sql<number>`count(*)` })
     .from(schema.leads)

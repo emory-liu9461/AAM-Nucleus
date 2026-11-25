@@ -11,6 +11,7 @@ import { cancelCrewInvites, crewFor, crewFromForm, feedPath, saveCrew } from "@/
 import { emailSettings, postmarkConfigured, postmarkSend } from "@/lib/email";
 import { appBase } from "@/lib/twilio";
 import { sendScheduled } from "@/lib/workflow";
+import { advanceStartedJobs, syncJobDates } from "@/lib/jobs";
 
 const { staffMembers, eventStaff, scheduleEvents, jobs } = schema;
 
@@ -145,9 +146,11 @@ export async function saveWork(slug: string, eventId: string | null, _: FormStat
 
   let id = eventId;
   let timeChanged = false;
+  let previousJobId: string | null = null;
   if (eventId) {
     const [old] = await db.select().from(scheduleEvents).where(and(eq(scheduleEvents.id, eventId), eq(scheduleEvents.businessId, b.id)));
     if (!old) return { error: "Not found." };
+    previousJobId = old.jobId;
     timeChanged =
       old.startsAt.getTime() !== startsAt.getTime() || old.endsAt.getTime() !== endsAt.getTime() || old.days !== days ||
       old.title !== title || (old.notes ?? null) !== notes || (old.jobId ?? null) !== jobId;
@@ -163,6 +166,10 @@ export async function saveWork(slug: string, eventId: string | null, _: FormStat
     id = row.id;
   }
   const { sent, problems } = await saveCrew(b, id!, crewFromForm(form), { timeChanged });
+  // The job's dates follow its schedule (and the job it was moved off, if any).
+  await syncJobDates(b, jobId);
+  if (previousJobId && previousJobId !== jobId) await syncJobDates(b, previousJobId);
+  await advanceStartedJobs(b.id);
   // Customer workflow: tell the customer when we're coming (new work, or a changed time).
   let customer = "";
   if (jobId && (!eventId || timeChanged)) {
@@ -179,6 +186,7 @@ export async function saveWork(slug: string, eventId: string | null, _: FormStat
 export async function deleteWork(slug: string, eventId: string) {
   const { business: b } = await requireBusiness(slug);
   await cancelCrewInvites(b, eventId);
-  await db.delete(scheduleEvents).where(and(eq(scheduleEvents.id, eventId), eq(scheduleEvents.businessId, b.id)));
+  const [gone] = await db.delete(scheduleEvents).where(and(eq(scheduleEvents.id, eventId), eq(scheduleEvents.businessId, b.id))).returning({ jobId: scheduleEvents.jobId });
+  await syncJobDates(b, gone?.jobId);
   refresh(slug);
 }
