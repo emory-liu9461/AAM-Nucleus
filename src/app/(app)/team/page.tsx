@@ -39,8 +39,8 @@ export default async function TeamPage() {
         </dl>
       </section>
 
-      <details className="card" open={people.length <= 1}>
-        <summary className="cursor-pointer text-sm font-semibold">+ Add a person</summary>
+      <section className="card">
+        <h2 className="text-sm font-semibold">Add a person</h2>
         <ActionForm action={createUser} submit="Add person" className="mt-4 grid gap-3 sm:grid-cols-2" resetOnSuccess>
           <label className="field">Name<input className="input" name="name" required /></label>
           <label className="field">Email (their login)<input className="input" type="email" name="email" required /></label>
@@ -48,7 +48,7 @@ export default async function TeamPage() {
           <label className="field">Temporary password<input className="input" name="password" minLength={8} required autoComplete="new-password" placeholder="At least 8 characters" /></label>
           <BusinessChecks businesses={biz} checked={biz.length === 1 ? [biz[0].id] : []} />
         </ActionForm>
-      </details>
+      </section>
 
       <section className="space-y-3">
         {people.map((p) => {

@@ -1,20 +1,26 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { login, setupOwner } from "../auth-actions";
 import { keepValuesOnSubmit } from "@/components/useKeepValues";
 
 export function LoginForm() {
   const [state, action, pending] = useActionState(login, null);
+  const [show, setShow] = useState(false);
   return (
     <form onSubmit={keepValuesOnSubmit(action)} className="space-y-4">
       <label className="field">
         Email
-        <input className="input" type="email" name="email" autoComplete="username" autoFocus required />
+        <input className="input" type="email" name="email" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoFocus required />
       </label>
       <label className="field">
         Password
-        <input className="input" type="password" name="password" autoComplete="current-password" required />
+        <div className="relative">
+          <input className="input w-full pr-16" type={show ? "text" : "password"} name="password" autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck={false} required />
+          <button type="button" onClick={() => setShow((v) => !v)} className="absolute inset-y-0 right-2 my-auto h-7 rounded px-2 text-xs font-medium text-muted hover:text-ink" aria-pressed={show}>
+            {show ? "Hide" : "Show"}
+          </button>
+        </div>
       </label>
       {state?.error && <p className="text-sm text-bad">{state.error}</p>}
       <button className="btn w-full" disabled={pending}>{pending ? "Signing in…" : "Sign in"}</button>

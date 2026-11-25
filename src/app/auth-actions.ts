@@ -34,6 +34,18 @@ async function startSession(userId: string, version: number) {
 const findByEmail = async (email: string) =>
   (await db.select().from(users).where(sql`lower(${users.email}) = ${email.toLowerCase()}`))[0];
 
+/**
+ * The exact password, or the same password as a phone keyboard often changes it: a stray space
+ * at either end (copied from a text) or an automatically capitalized first letter.
+ */
+async function passwordMatches(password: string, hash: string) {
+  const trimmed = password.trim();
+  const flipFirst = (p: string) => (p ? (p[0] === p[0].toUpperCase() ? p[0].toLowerCase() : p[0].toUpperCase()) + p.slice(1) : p);
+  const tries = [...new Set([password, trimmed, flipFirst(trimmed)])].filter((p) => p.length > 0);
+  for (const p of tries) if (await verifyPassword(p, hash)) return true;
+  return false;
+}
+
 const userCount = async () => Number((await db.select({ c: sql<number>`count(*)` }).from(users))[0].c);
 
 /* ---------- sign in / out ---------- */
@@ -43,7 +55,7 @@ export async function login(_: FormState, form: FormData): Promise<FormState> {
   const email = str(form, "email");
   const password = String(form.get("password") ?? "");
   const user = email ? await findByEmail(email) : undefined;
-  const valid = await verifyPassword(password, user?.passwordHash ?? DUMMY_HASH);
+  const valid = await passwordMatches(password, user?.passwordHash ?? DUMMY_HASH);
   if (!user || !valid) return { error: "Incorrect email or password" };
   if (!user.active) return { error: "This account has been deactivated. Ask the owner to reactivate it." };
   await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
@@ -83,7 +95,7 @@ export async function setupOwner(_: FormState, form: FormData): Promise<FormStat
   if (!name) return { error: "Enter your name" };
   if (!emailOk(email)) return { error: "Enter a valid email" };
   if (password.length < MIN_PASSWORD) return { error: `Password must be at least ${MIN_PASSWORD} characters` };
-  if (password !== String(form.get("confirm") ?? "")) return { error: "Passwords don't match" };
+  if (password !== String(form.get("confirm") ?? "").trim()) return { error: "Passwords don't match" };
   const [u] = await db.insert(users).values({ name, email, passwordHash: await hashPassword(password), role: "owner" }).returning();
   await startSession(u.id, u.sessionVersion);
   redirect("/");
@@ -108,7 +120,7 @@ export async function updateMyName(_: FormState, form: FormData): Promise<FormSt
 export async function changeMyPassword(_: FormState, form: FormData): Promise<FormState> {
   const { user } = await requireSession();
   const current = String(form.get("current") ?? "");
-  const next = String(form.get("password") ?? "");
+  const next = String(form.get("password") ?? "").trim();
   if (!(await verifyPassword(current, user.passwordHash))) return { error: "Current password is incorrect" };
   if (next.length < MIN_PASSWORD) return { error: `New password must be at least ${MIN_PASSWORD} characters` };
   if (next !== String(form.get("confirm") ?? "")) return { error: "Passwords don't match" };
@@ -139,7 +151,7 @@ export async function createUser(_: FormState, form: FormData): Promise<FormStat
   const name = str(form, "name");
   const email = str(form, "email");
   const role = str(form, "role") as Role;
-  const password = String(form.get("password") ?? "");
+  const password = String(form.get("password") ?? "").trim();
   const access = form.getAll("businessIds").map(String);
   if (!name) return { error: "Enter a name" };
   if (!emailOk(email)) return { error: "Enter a valid email" };
@@ -188,7 +200,7 @@ export async function setUserActive(userId: string, active: boolean) {
 
 export async function resetUserPassword(userId: string, _: FormState, form: FormData): Promise<FormState> {
   const { user: me } = await requirePermission("manage_team");
-  const password = String(form.get("password") ?? "");
+  const password = String(form.get("password") ?? "").trim();
   if (password.length < MIN_PASSWORD) return { error: `Password must be at least ${MIN_PASSWORD} characters` };
   const [target] = await db.select().from(users).where(eq(users.id, userId));
   if (!target) return { error: "User not found" };
