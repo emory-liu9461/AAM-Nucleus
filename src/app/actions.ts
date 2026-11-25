@@ -7,7 +7,7 @@ import { z } from "zod";
 import { db, schema } from "@/db";
 import { dollarsToCents, slugify } from "@/lib/format";
 import { can, requireBusiness, requirePermission } from "@/lib/session";
-import { BRAND_LOGOS, normalizeDomain, pageSections, presetWarranty, toLines } from "@/lib/site-defaults";
+import { BRAND_LOGOS, guaranteeDays, guaranteeLabel, guaranteeWithin, normalizeDomain, pageSections, presetWarranty, toLines } from "@/lib/site-defaults";
 import type { AlertSettings, AssistantSettings, EmailSettings, PhoneSettings, ReviewSettings, SiteContent, SiteSectionKey, SiteSectionText } from "@/db/schema";
 import { alertSettings, notify } from "@/lib/alerts";
 import { reviewSettings, sendReviewRequest } from "@/lib/reviews";
@@ -22,7 +22,7 @@ import { saveStats } from "@/lib/social-sync/store";
 import { isValidTimezone } from "@/lib/availability";
 import { cancelCrewInvites } from "@/lib/staff";
 import { syncJobDates } from "@/lib/jobs";
-import { sendCompleted, sendWelcome, workflowSettings } from "@/lib/workflow";
+import { sendCompleted, sendVisitCancelled, sendWelcome, workflowSettings } from "@/lib/workflow";
 
 // Every action checks the signed-in user's access first. requireBusiness() 404s
 // if the user isn't assigned to that business; the optional permission argument
@@ -257,6 +257,7 @@ export async function voidInvoice(slug: string, invoiceId: string) {
 
 export async function deleteEvent(slug: string, eventId: string) {
   const { business: b } = await requireBusiness(slug);
+  await sendVisitCancelled(b, eventId).catch((e) => console.error("visit cancelled message:", e)); // the customer, if it was still to come
   await cancelCrewInvites(b, eventId); // anyone on it gets a cancellation
   const [gone] = await db.delete(scheduleEvents).where(and(eq(scheduleEvents.id, eventId), eq(scheduleEvents.businessId, b.id))).returning({ jobId: scheduleEvents.jobId });
   await syncJobDates(b, gone?.jobId); // the job's dates follow what's left on its schedule
@@ -328,6 +329,10 @@ export async function updateSiteContent(slug: string, _: { error?: string; ok?: 
       return { name, city: city || undefined, text: text ?? "", rating: Number(rating) || 5 };
     }).filter((r) => r.name && r.text),
     financing: str(form, "financing") ?? undefined,
+    guaranteeDays: (() => {
+      const n = Number(str(form, "guaranteeDays") ?? "14");
+      return Number.isFinite(n) && n >= 0 && n <= 365 && Math.round(n) !== 14 ? Math.round(n) : undefined;
+    })(),
     ...editableSections(b, form),
     social: b.site?.social ?? {}, // edited on the Social tab
     analytics: { ga4: str(form, "ga4") ?? undefined, googleAds: str(form, "googleAds") ?? undefined, metaPixel: str(form, "metaPixel") ?? undefined },
@@ -359,7 +364,21 @@ function editableSections(b: Pick<typeof businesses.$inferSelect, "name" | "trad
   // A customized list keeps up with a changed warranty (the line that showed the old one).
   const oldWarranty = old.warranty || presetWarranty(b.trade);
   const newWarranty = String(form.get("warranty") ?? "").trim() || presetWarranty(b.trade);
-  const trust = pairs("trustPoints", shown.trustPoints.map((t) => ({ a: t.label, b: t.detail })))?.map((x) => (x.b === oldWarranty ? { ...x, b: newWarranty } : x));
+  // …and with a changed guarantee (0 days removes that line).
+  const oldDays = guaranteeDays(b);
+  const n = Number(String(form.get("guaranteeDays") ?? "14").trim() || "14");
+  const newDays = Number.isFinite(n) && n >= 0 && n <= 365 ? Math.round(n) : oldDays;
+  const isOldGuarantee = (x: { a: string }) => oldDays > 0 && x.a === guaranteeLabel(oldDays);
+  const trust = pairs("trustPoints", shown.trustPoints.map((t) => ({ a: t.label, b: t.detail })))
+    ?.map((x) => (x.b === oldWarranty ? { ...x, b: newWarranty } : x))
+    .flatMap((x) =>
+      !isOldGuarantee(x) || newDays === oldDays ? [x]
+      : newDays === 0 ? []
+      : [{ a: guaranteeLabel(newDays), b: `Not satisfied? Tell us within ${guaranteeWithin(newDays)} and we'll make it right` }],
+    );
+  // Guarantee switched back on: put its line back (second, as in the defaults).
+  if (trust && oldDays === 0 && newDays > 0 && !trust.some((x) => /guarantee/i.test(x.a)))
+    trust.splice(1, 0, { a: guaranteeLabel(newDays), b: `Not satisfied? Tell us within ${guaranteeWithin(newDays)} and we'll make it right` });
   const pri = pairs("priorities", shown.priorities.map((t) => ({ a: t.title, b: t.text })));
   const proc = pairs("process", shown.process.map((t) => ({ a: t.title, b: t.text })));
   const sections: Partial<Record<SiteSectionKey, SiteSectionText>> = {};

@@ -139,9 +139,10 @@ export async function Dashboard({ title, subtitle, list, range }: { title: strin
                   <div className="truncate font-medium">{e.title}</div>
                   <div className="text-xs text-muted">
                     {fmtDateTime(e.startsAt)} · {label(e.type)}
-                    {e.assignee ? ` · ${e.assignee}` : ""}
+                    {!e.crew && e.assignee ? ` · ${e.assignee}` : ""}
                     {multi ? ` · ${byId[e.businessId]?.name}` : ""}
                   </div>
+                  <div className="text-xs">{e.crew ? <span>👷 {e.crew}</span> : e.type === "job_work" ? <span className="text-bad">No crew assigned</span> : null}</div>
                 </div>
               </li>
             ))}

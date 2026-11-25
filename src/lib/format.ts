@@ -10,6 +10,10 @@ export const money = (cents: number, compact = false) =>
     notation: compact ? "compact" : "standard",
   }).format(cents / 100);
 
+/** Always to the cent, for invoices and payments ("$1,130.45"). */
+export const moneyExact = (cents: number) =>
+  new Intl.NumberFormat(LOCALE, { style: "currency", currency: CURRENCY, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(cents / 100);
+
 export const pct = (n: number | null) => (n == null ? "—" : `${Math.round(n * 100)}%`);
 
 export const dollarsToCents = (v: FormDataEntryValue | null) => {

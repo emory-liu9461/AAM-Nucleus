@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { businessTz, fmtTime, localDay, occurrences, whenLabel } from "@/lib/calendar";
 import { crewFor } from "@/lib/staff";
 import { arrivalText, workflowSettings } from "@/lib/workflow";
-import { logoFor } from "@/lib/site-defaults";
+import { guaranteeDays, guaranteeWithin, logoFor } from "@/lib/site-defaults";
+import { moneyExact } from "@/lib/format";
 import { reviewSettings } from "@/lib/reviews";
 
 /*
@@ -33,11 +34,17 @@ export default async function ProjectPage({ params }: { params: Promise<{ token:
   const tz = businessTz(b);
   const w = workflowSettings(b);
 
-  const [events, updates, photos, [review]] = await Promise.all([
+  const guarantee = guaranteeDays(b);
+  const [events, updates, photos, [review], bills] = await Promise.all([
     db.select().from(scheduleEvents).where(eq(scheduleEvents.jobId, job.id)).orderBy(asc(scheduleEvents.startsAt)),
     db.select().from(jobUpdates).where(eq(jobUpdates.jobId, job.id)).orderBy(desc(jobUpdates.createdAt)),
     db.select({ id: jobPhotos.id, updateId: jobPhotos.updateId, width: jobPhotos.width, height: jobPhotos.height }).from(jobPhotos).where(eq(jobPhotos.jobId, job.id)).orderBy(asc(jobPhotos.createdAt)),
     db.select({ token: reviewRequests.token }).from(reviewRequests).where(eq(reviewRequests.jobId, job.id)),
+    db
+      .select({ number: schema.invoices.number, amount: schema.invoices.amount, status: schema.invoices.status, dueAt: schema.invoices.dueAt, payToken: schema.invoices.payToken, paid: sql<number>`(select coalesce(sum(p.amount),0) from payments p where p.invoice_id = "invoices"."id")` })
+      .from(schema.invoices)
+      .where(and(eq(schema.invoices.jobId, job.id), sql`${schema.invoices.status} <> 'void'`))
+      .orderBy(asc(schema.invoices.issuedAt)),
   ]);
   const crews = await crewFor(events.map((e) => e.id));
   const now = new Date();
@@ -83,7 +90,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ token:
         {job.status === "completed" ? (
           <section className="card space-y-2">
             <h2 className="font-semibold">Your project is complete 🎉</h2>
-            <p className="text-sm">Thank you for choosing {b.name}. Our guarantee: if anything isn&apos;t right, tell us within 2 weeks of finishing and we&apos;ll come back and make it right.</p>
+            <p className="text-sm">Thank you for choosing {b.name}.{guarantee ? ` Our guarantee: if anything isn't right, tell us within ${guaranteeWithin(guarantee)} of finishing and we'll come back and make it right.` : " If anything isn't right, just call or reply to our message and we'll make it right."}</p>
             {reviewHref && <a href={reviewHref} className="btn inline-block" style={{ background: b.color }}>Leave us a review</a>}
           </section>
         ) : (
@@ -147,6 +154,27 @@ export default async function ProjectPage({ params }: { params: Promise<{ token:
             );
           })}
         </section>
+
+        {bills.length > 0 && (
+          <section className="card space-y-2">
+            <h2 className="font-semibold">Invoices</h2>
+            <ul className="divide-y divide-line text-sm">
+              {bills.map((i) => {
+                const due = i.amount - Number(i.paid);
+                return (
+                  <li key={i.payToken} className="flex items-center justify-between gap-3 py-2">
+                    <span>{i.number} · {moneyExact(i.amount)}</span>
+                    {due > 0 ? (
+                      <a href={`/pay/${i.payToken}`} className="btn py-1.5 text-sm" style={{ background: b.color }}>Pay {moneyExact(due)}</a>
+                    ) : (
+                      <span className="font-medium text-good">Paid ✓</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
 
         <section className="card space-y-1 text-sm">
           <h2 className="font-semibold">Questions?</h2>

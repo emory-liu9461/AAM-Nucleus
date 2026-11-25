@@ -5,6 +5,7 @@ import type { Business } from "@/db/schema";
 const { businesses, leads, jobs, invoices, payments, scheduleEvents, contacts } = schema;
 
 import { RANGES, type RangeKey } from "./ranges";
+import { crewFor } from "./staff";
 export { RANGES, type RangeKey };
 
 export function resolveRange(key: string | undefined): { key: RangeKey; from: Date; to: Date } {
@@ -192,7 +193,7 @@ export async function upcomingEvents(businessIds: string[], days = 7) {
   if (!businessIds.length) return [];
   const now = new Date();
   const end = new Date(now.getTime() + days * 864e5);
-  return db
+  const rows = await db
     .select({
       id: scheduleEvents.id,
       title: scheduleEvents.title,
@@ -215,6 +216,9 @@ export async function upcomingEvents(businessIds: string[], days = 7) {
     )
     .orderBy(asc(scheduleEvents.startsAt))
     .limit(20);
+  // Who's on each one: "Sam (Driver), Ana (Painter)".
+  const crews = await crewFor(rows.map((r) => r.id));
+  return rows.map((r) => ({ ...r, crew: (crews.get(r.id) ?? []).map((c) => `${c.name.split(" ")[0]}${c.role ? ` (${c.role})` : ""}`).join(", ") }));
 }
 
 export async function activeBusinesses(): Promise<Business[]> {

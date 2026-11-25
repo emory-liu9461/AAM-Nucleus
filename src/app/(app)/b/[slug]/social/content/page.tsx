@@ -93,6 +93,10 @@ export default async function SiteContentPage({ params }: { params: Promise<{ sl
           <Field name="yearsInBusiness" label="Years in business" value={c.yearsInBusiness?.toString()} placeholder="12" />
           <Field name="license" label="License number" value={c.license} placeholder="IL #104-012345" />
           <Field name="warranty" label="Warranty" value={c.warranty} placeholder={d.warranty} />
+          <label className="field">Satisfaction guarantee (days)
+            <input className="input" name="guaranteeDays" type="number" min={0} max={365} defaultValue={c.guaranteeDays ?? 14} />
+            <span className="font-normal">&ldquo;Not satisfied? Tell us within … and we&apos;ll make it right.&rdquo; Used on the website and in the job-completed message. 0 = no guarantee.</span>
+          </label>
           <Field name="hours" label="Hours" value={c.hours} placeholder={d.hours} />
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="insured" defaultChecked={c.insured ?? true} /> Fully insured</label>
           <Area name="about" label="About us" rows={4} value={c.about} placeholder={d.about} />

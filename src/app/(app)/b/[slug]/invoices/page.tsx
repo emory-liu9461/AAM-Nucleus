@@ -2,9 +2,16 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { createInvoice, recordPayment, voidInvoice } from "@/app/actions";
 import { requireBusinessPage } from "@/lib/session";
-import { fmtDate, label, money } from "@/lib/format";
+import { fmtDate, label, money, moneyExact } from "@/lib/format";
 import { Badge } from "@/components/Badge";
 import { Kpi } from "@/components/Kpi";
+import { CopyButton } from "@/components/CopyButton";
+import { ActionForm } from "@/components/ActionForm";
+import { sendInvoiceLink } from "@/app/payment-actions";
+import { appBase } from "@/lib/twilio";
+import { cardPaymentsOn } from "@/lib/stripe";
+import { headers } from "next/headers";
+import Link from "next/link";
 
 const { invoices, payments, contacts, jobs, users, paymentMethod } = schema;
 
@@ -19,7 +26,7 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
     view === "open" ? sql`${invoices.status} in ('sent','partial')`
     : view === "overdue" ? sql`${invoices.status} in ('sent','partial') and ${invoices.dueAt} < ${today}`
     : view === "paid" ? sql`${invoices.status} = 'paid'` : sql`true`;
-  const paidSql = sql<number>`(select coalesce(sum(amount),0) from ${payments} where ${payments.invoiceId} = ${invoices.id})`;
+  const paidSql = sql<number>`(select coalesce(sum(p.amount),0) from payments p where p.invoice_id = "invoices"."id")`;
   const [rows, openJobs, aging] = await Promise.all([
     db
       .select({ inv: invoices, first: contacts.firstName, last: contacts.lastName, job: jobs.name, paid: paidSql, by: users.name })
@@ -44,6 +51,8 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
       ) x`),
   ]);
   const a = (aging as unknown as Record<string, unknown>[])[0] ?? {};
+  const base = appBase(await headers());
+  const cards = cardPaymentsOn(b);
 
   return (
     <div className="space-y-5">
@@ -53,6 +62,12 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
         <Kpi label="31–60 days overdue" value={money(Number(a.d60 ?? 0))} tone={Number(a.d60) > 0 ? "bad" : undefined} />
         <Kpi label="60+ days overdue" value={money(Number(a.d90 ?? 0))} tone={Number(a.d90) > 0 ? "bad" : undefined} />
       </section>
+
+      {!cards && (
+        <p className="card text-sm text-muted">
+          Customers can open each invoice from a link and pay by e-Transfer. To take cards too, connect Stripe in <Link className="text-accent hover:underline" href={`/b/${b.slug}/settings#payments`}>Settings → Online payments</Link>.
+        </p>
+      )}
 
       <details className="card">
         <summary className="cursor-pointer text-sm font-semibold">+ New invoice</summary>
@@ -84,9 +99,9 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
 
       <section className="card overflow-x-auto p-0">
         <table className="tbl">
-          <thead><tr><th>Invoice</th><th>Customer / job</th><th>Issued</th><th>Due</th><th className="text-right">Amount</th><th className="text-right">Balance</th><th>Status</th><th>Record payment</th></tr></thead>
+          <thead><tr><th>Invoice</th><th>Customer / job</th><th>Issued</th><th>Due</th><th className="text-right">Amount</th><th className="text-right">Balance</th><th>Status</th><th>Customer link</th><th>Record payment</th></tr></thead>
           <tbody>
-            {rows.length === 0 && <tr><td colSpan={8} className="py-8 text-center text-muted">No invoices here.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={9} className="py-8 text-center text-muted">No invoices here.</td></tr>}
             {rows.map(({ inv, first, last, job, paid, by }) => {
               const balance = inv.amount - Number(paid);
               const overdue = (inv.status === "sent" || inv.status === "partial") && inv.dueAt < today;
@@ -98,11 +113,19 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
                   <td className="text-muted">{fmtDate(inv.issuedAt)}</td>
                   <td className={overdue ? "text-bad" : "text-muted"}>{fmtDate(inv.dueAt)}</td>
                   <td className="text-right">
-                    {money(inv.amount)}
-                    {inv.taxAmount > 0 && <div className="text-xs text-muted">incl. {inv.taxLabel} {money(inv.taxAmount)}</div>}
+                    {moneyExact(inv.amount)}
+                    {inv.taxAmount > 0 && <div className="text-xs text-muted">incl. {inv.taxLabel} {moneyExact(inv.taxAmount)}</div>}
                   </td>
-                  <td className="text-right">{inv.status === "void" ? "—" : money(balance)}</td>
+                  <td className="text-right">{inv.status === "void" ? "—" : moneyExact(balance)}</td>
                   <td><Badge value={overdue ? "overdue" : inv.status} /></td>
+                  <td>
+                    {inv.status !== "void" && (
+                      <div className="flex items-center gap-1">
+                        <CopyButton value={`${base}/pay/${inv.payToken}`} />
+                        {open && <ActionForm action={sendInvoiceLink.bind(null, b.slug, inv.id)} submit="Send" pendingText="Sending…" className="flex items-center gap-1 [&_.btn]:py-1 [&_.btn]:text-xs [&_p]:text-xs"><span /></ActionForm>}
+                      </div>
+                    )}
+                  </td>
                   <td>
                     {open && (
                       <div className="flex items-center gap-1">

@@ -8,6 +8,7 @@ import { emailSettings, postmarkConfigured, sendBusinessEmail } from "./email";
 import { phoneSettings, sendBusinessSms } from "./sms";
 import { toE164, twilioConfigured } from "./twilio";
 import { reviewSettings } from "./reviews";
+import { guaranteeDays, guaranteeWithin } from "./site-defaults";
 
 /*
  * Customer workflow: what the customer hears from the business through a job.
@@ -25,19 +26,21 @@ const { jobs, contacts, jobUpdates, scheduleEvents, reviewRequests, businesses }
 export const STEPS: { key: WorkflowStep; title: string; when: string; placeholders: string }[] = [
   { key: "welcome", title: "Job booked", when: "When a lead is marked Won (the job is created)", placeholders: "{name} {business} {job} {link}" },
   { key: "scheduled", title: "Work scheduled", when: "When work for the job is put on the schedule, or the time changes", placeholders: "{name} {business} {job} {dates} {arrival} {crew} {link}" },
+  { key: "visit_cancelled", title: "Visit cancelled", when: "When scheduled work for the job is deleted (before it happens)", placeholders: "{name} {business} {job} {dates} {phone} {link}" },
   { key: "reminder", title: "Day-before reminder", when: "The day before the crew arrives (sent each morning)", placeholders: "{name} {business} {job} {dates} {arrival} {crew} {link}" },
   { key: "on_the_way", title: "On our way", when: "When you press “On our way” on a job", placeholders: "{name} {business} {crew} {eta} {link}" },
   { key: "progress", title: "Progress update", when: "When you post an update (with photos) on a job", placeholders: "{name} {business} {job} {update} {link}" },
-  { key: "completed", title: "Job completed", when: "When the job is marked Completed", placeholders: "{name} {business} {job} {link} {review_link}" },
+  { key: "completed", title: "Job completed", when: "When the job is marked Completed", placeholders: "{name} {business} {job} {link} {review_link} {guarantee_line}" },
 ];
 
 const DEFAULT_MESSAGES: Record<WorkflowStep, string> = {
   welcome: "Hi {name}, thanks for choosing {business}! Your project ({job}) is booked. Here's your project page, with how to get ready and when we'll be there: {link}",
   scheduled: "Hi {name}, your {job} is scheduled for {dates}. Our crew arrives between {arrival}: {crew}. Details and prep checklist: {link}",
+  visit_cancelled: "Hi {name}, our visit for your {job} on {dates} has been cancelled. We'll be in touch to find a new time. Questions? Call us at {phone}. {link}",
   reminder: "Hi {name}, a reminder that {business} arrives tomorrow between {arrival}. Please make sure we can get in and the work areas are clear: {link}",
   on_the_way: "Hi {name}, {crew} from {business} {eta}. See you soon!",
   progress: "Update on your {job}: {update} Photos: {link}",
-  completed: "Hi {name}, your {job} is complete! Thank you for choosing {business}. If anything isn't right, tell us within 2 weeks and we'll make it right. Photos and details: {link}{review_line}",
+  completed: "Hi {name}, your {job} is complete! Thank you for choosing {business}.{guarantee_line} Photos and details: {link}{review_line}",
 };
 
 const PREP_GUIDES: [RegExp, string[]][] = [
@@ -192,6 +195,16 @@ export async function sendScheduled(b: Business, eventId: string, opts: { userId
   return deliver(ctx, "scheduled", opts.changed ? `Schedule change: ${text}` : text, { eventId, userId: opts.userId });
 }
 
+/** Scheduled work for the job is about to be deleted: tell the customer (only for visits still to come). */
+export async function sendVisitCancelled(b: Business, eventId: string, opts: { userId?: string | null } = {}) {
+  const [e] = await db.select().from(scheduleEvents).where(and(eq(scheduleEvents.id, eventId), eq(scheduleEvents.businessId, b.id)));
+  if (!e?.jobId || e.startsAt < new Date()) return null;
+  const s = workflowSettings(b).steps.visit_cancelled;
+  const ctx = await context(b, e.jobId);
+  if (!ctx || !s.enabled || ["completed", "cancelled"].includes(ctx.job.status)) return null;
+  return deliver(ctx, "visit_cancelled", fill(s.message, await eventVars(ctx, e)), { userId: opts.userId });
+}
+
 export async function sendOnTheWay(b: Business, jobId: string, etaMinutes: number | null, userId: string) {
   const ctx = await context(b, jobId);
   if (!ctx) return { error: "Job not found" };
@@ -230,7 +243,13 @@ export async function sendCompleted(b: Business, jobId: string, opts: { userId?:
     token = existing?.token ?? randomBytes(9).toString("base64url");
     reviewLink = appUrl() ? `${appUrl()}/r/${token}` : r.link;
   }
-  const vars = { ...base(ctx), review_link: reviewLink, review_line: reviewLink ? ` If you're happy with the work, a quick review helps a local business a lot: ${reviewLink}` : "" };
+  const days = guaranteeDays(b);
+  const vars = {
+    ...base(ctx),
+    review_link: reviewLink,
+    review_line: reviewLink ? ` If you're happy with the work, a quick review helps a local business a lot: ${reviewLink}` : "",
+    guarantee_line: days ? ` If anything isn't right, tell us within ${guaranteeWithin(days)} and we'll make it right.` : "",
+  };
   const msg = s.message.includes("{review_link}") || s.message.includes("{review_line}") || !reviewLink ? fill(s.message, vars) : `${fill(s.message, vars)} Leave us a review: ${reviewLink}`;
   const sent = await deliver(ctx, "completed", msg, opts);
   // Track the review link like a review request, so clicks and the reminder still work.

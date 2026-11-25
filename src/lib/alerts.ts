@@ -11,13 +11,14 @@ import { sendTwilioSms, twilioConfigured } from "./twilio";
  * own Twilio number and email address. Alerts never block or break the main action.
  */
 
-export type AlertKind = "newLead" | "booking" | "voicemail" | "needsReply";
+export type AlertKind = "newLead" | "booking" | "voicemail" | "needsReply" | "payment";
 
 export const ALERT_KINDS: [AlertKind, string][] = [
   ["newLead", "New lead (website form, chat, text, email, call)"],
   ["booking", "Site visit or call booked by the AI assistant"],
   ["voicemail", "Voicemail or missed call"],
   ["needsReply", "Customer message the AI isn't answering (paused, off or handed off)"],
+  ["payment", "Invoice paid online by card"],
 ];
 
 /** Settings with defaults: all alert types on; emails default to the business's owners. */
@@ -35,6 +36,7 @@ export async function alertSettings(b: Pick<Business, "alertSettings">) {
     booking: a.booking ?? true,
     voicemail: a.voicemail ?? true,
     needsReply: a.needsReply ?? true,
+    payment: a.payment ?? true,
   };
 }
 

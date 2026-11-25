@@ -141,6 +141,8 @@ export const businesses = pgTable("businesses", {
   reviewSettings: jsonb("review_settings").$type<ReviewSettings>(),
   // Customer workflow: automatic messages through a job, and the prep guide.
   workflowSettings: jsonb("workflow_settings").$type<WorkflowSettings>(),
+  // Online payments: Stripe keys (encrypted) and e-Transfer instructions.
+  paymentSettings: jsonb("payment_settings").$type<PaymentSettings>(),
   // Sales tax added to invoices (e.g. "HST", "13").
   taxLabel: text("tax_label"),
   taxRate: text("tax_rate"),
@@ -258,6 +260,11 @@ export const invoices = pgTable(
     subtotal: integer("subtotal"), // before tax (null on older invoices: amount had no tax)
     taxAmount: integer("tax_amount").notNull().default(0),
     taxLabel: text("tax_label"),
+    // Secret in the customer's payment link (/pay/<token>).
+    payToken: text("pay_token")
+      .notNull()
+      .unique()
+      .default(sql`replace(gen_random_uuid()::text, '-', '')`),
     createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -280,7 +287,8 @@ export const payments = pgTable(
     reference: text("reference"),
     createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
   },
-  (t) => [index("payments_business_idx").on(t.businessId)],
+  // A Stripe payment ("stripe:<checkout session>") is recorded once, however many times Stripe reports it.
+  (t) => [index("payments_business_idx").on(t.businessId), uniqueIndex("payments_stripe_ref").on(t.reference).where(sql`${t.reference} like 'stripe:%'`)],
 );
 
 export const scheduleEvents = pgTable(
@@ -370,6 +378,7 @@ export type SiteContent = {
   services?: { name: string; summary?: string }[];
   reviews?: { name: string; city?: string; text: string; rating?: number }[];
   financing?: string;
+  guaranteeDays?: number; // satisfaction guarantee ("tell us within N days and we'll make it right"); 0 = none
   // Editable page sections (empty = the defaults in src/lib/site-defaults.ts).
   trustPoints?: { label: string; detail?: string }[];
   priorities?: { title: string; text?: string }[];
@@ -662,7 +671,7 @@ export const jobPhotos = pgTable(
   (t) => [index("job_photos_job_idx").on(t.jobId)],
 );
 
-export type WorkflowStep = "welcome" | "scheduled" | "reminder" | "on_the_way" | "progress" | "completed";
+export type WorkflowStep = "welcome" | "scheduled" | "visit_cancelled" | "reminder" | "on_the_way" | "progress" | "completed";
 export type WorkflowMessage = { enabled?: boolean; sms?: boolean; email?: boolean; message?: string };
 export type WorkflowSettings = {
   steps?: Partial<Record<WorkflowStep, WorkflowMessage>>;
@@ -694,9 +703,18 @@ export const projectPhotos = pgTable(
   (t) => [index("photos_business_idx").on(t.businessId, t.sortOrder)],
 );
 
+export type PaymentSettings = {
+  stripeKey?: string; // encrypted secret/restricted key (src/lib/secret-box.ts)
+  stripeWebhookSecret?: string; // encrypted webhook signing secret
+  stripeAccount?: string; // account name shown in Nucleus
+  etransferEmail?: string;
+  etransferNote?: string;
+};
+
 export type AlertSettings = {
   phones?: string[]; // E.164, get a text for each alert
   emails?: string[];
+  payment?: boolean; // an invoice paid online
   newLead?: boolean;
   booking?: boolean;
   voicemail?: boolean;

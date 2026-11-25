@@ -114,6 +114,13 @@ export type PublicSite = ReturnType<typeof publicSite>;
 
 export const presetWarranty = (trade: string) => presetFor(trade).warranty;
 
+/** Satisfaction guarantee, in days (Website content → Why choose you). 0 = none. */
+export const guaranteeDays = (b: Pick<Business, "site">) => Math.max(0, Math.round(b.site?.guaranteeDays ?? 14));
+/** 14 -> "2 weeks", 7 -> "1 week", 10 -> "10 days" */
+export const guaranteeWithin = (days: number) => (days % 7 === 0 ? `${days / 7} week${days === 7 ? "" : "s"}` : `${days} day${days === 1 ? "" : "s"}`);
+/** 14 -> "2-week guarantee", 10 -> "10-day guarantee" */
+export const guaranteeLabel = (days: number) => (days % 7 === 0 ? `${days / 7}-week guarantee` : `${days}-day guarantee`);
+
 /* ---------- editable page sections: defaults ---------- */
 
 export const SECTION_LABELS: Record<SiteSectionKey, string> = {
@@ -145,7 +152,7 @@ export function defaultSections(b: Pick<Business, "name" | "trade">, c: SiteCont
 export function defaultTrustPoints(c: SiteContent, warranty: string) {
   return [
     { label: c.insured ?? true ? "Licensed & insured" : "Licensed", detail: [c.license ? `License ${c.license}` : "Fully licensed", c.insured ?? true ? "insured for your protection" : ""].filter(Boolean).join(", ") },
-    { label: "2-week guarantee", detail: "Not satisfied? Tell us within 2 weeks and we'll make it right" },
+    ...(guaranteeDays({ site: c }) ? [{ label: guaranteeLabel(guaranteeDays({ site: c })), detail: `Not satisfied? Tell us within ${guaranteeWithin(guaranteeDays({ site: c }))} and we'll make it right` }] : []),
     { label: "Warranty", detail: warranty },
     { label: "Fast response", detail: "Quick replies to every call, text and quote request" },
     { label: "Clear communication", detail: "Schedules, updates and photos at every step" },
@@ -153,8 +160,8 @@ export function defaultTrustPoints(c: SiteContent, warranty: string) {
   ];
 }
 
-export const DEFAULT_PRIORITIES = [
-  { title: "Quality work", text: "Done right the first time, with careful prep and clean finishes. Not satisfied? Tell us within 2 weeks and we'll make it right." },
+export const defaultPriorities = (c: SiteContent) => [
+  { title: "Quality work", text: `Done right the first time, with careful prep and clean finishes.${guaranteeDays({ site: c }) ? ` Not satisfied? Tell us within ${guaranteeWithin(guaranteeDays({ site: c }))} and we'll make it right.` : ""}` },
   { title: "Transparency and service", text: "Clear quotes, honest answers, and updates with photos so you always know where things stand." },
   { title: "On time and fairly priced", text: "We show up when we say we will and stick to the price we agreed." },
 ];
@@ -250,7 +257,7 @@ export function pageSections(b: Pick<Business, "name" | "trade">, c: SiteContent
   const clean = <T extends { detail?: string; text?: string }>(l: T[]) => l.filter(Boolean);
   return {
     trustPoints: c.trustPoints?.length ? clean(c.trustPoints).map((t) => ({ label: t.label, detail: t.detail ?? "" })) : defaultTrustPoints(c, warranty),
-    priorities: c.priorities?.length ? c.priorities.map((t) => ({ title: t.title, text: t.text ?? "" })) : DEFAULT_PRIORITIES,
+    priorities: c.priorities?.length ? c.priorities.map((t) => ({ title: t.title, text: t.text ?? "" })) : defaultPriorities(c),
     process: c.process?.length ? c.process.map((t) => ({ title: t.title, text: t.text ?? "" })) : DEFAULT_PROCESS,
     sections,
   };

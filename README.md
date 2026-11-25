@@ -92,7 +92,17 @@ Daily jobs: `/api/cron/daily` (Vercel Cron, `CRON_SECRET`) syncs social stats an
 - **Jobs and the schedule are linked:** each job on the Jobs tab shows its scheduled visits and crew (with roles and invite status) and has its own **Assign work** form with the job already picked. A job's start and end dates follow its schedule, and a Scheduled job becomes In progress once its first scheduled work starts (checked when you open the business, and by the daily job).
 - Times use the business time zone (Settings for the AI assistant's booking hours). Calendar replies ("Accepted: …") from crew are kept out of the Inbox.
 
+## Online payments
+
+Every invoice has a private payment page (`/pay/<token>`): the invoice with tax, what's been paid, a **Pay by card** button (Stripe Checkout) and Interac e-Transfer instructions. On the Invoices tab, **Copy link** or **Send** (text and email) gives it to the customer; the customer's project page lists the job's invoices with Pay buttons.
+
+- **Settings → Online payments** (owner): paste the business's own Stripe secret key (checked against Stripe, stored encrypted with a key derived from `AUTH_SECRET`; if AUTH_SECRET changes, re-enter it) and the webhook signing secret, and add the e-Transfer email and note. Each business has its own Stripe account, so payouts go straight to it.
+- Stripe webhook: `/api/stripe/webhook/<business id>` (shown in Settings) for `checkout.session.completed` and `checkout.session.async_payment_succeeded`. Payments are recorded when the customer comes back from Stripe and by the webhook, once each (`payments.reference = stripe:<session>`), and the invoice becomes Paid or Partial. An alert (Settings → Alerts, "Invoice paid online") goes to the team.
+- Charged in `CURRENCY` (CAD by default). For local testing, `STRIPE_API_BASE` points at a stand-in.
+
 ## Website page sections
+
+Social → Edit website content → **Satisfaction guarantee (days)** (default 14, 0 = none) sets the guarantee wording on the website, the job-completed message and the project page.
 
 Social → Edit website content → **Page sections**: show or hide each part of the home page (trust points, services, recent projects, how it works, reviews, about, what we stand for, call to action) and edit its small label, heading and intro. Trust points, "What we stand for" and "How it works" are lists (`Title | description`, one per line); trust point icons are picked from the wording. Anything left as shown keeps following the defaults (e.g. a new warranty or licence number), and clearing a heading or list goes back to the default.
 
@@ -102,7 +112,7 @@ Social → Edit website content → **Page sections**: show or hide each part of
 
 - **Jobs** view: every active job with its journey (which messages went out, and how), the next visit and crew, the customer's project page link, an **On our way** button (with arrival time), **Post a progress update** (text and photos, resized on the phone before upload) and the activity log.
 - **Messages & rules** (owner): turn each step on or off, choose text and/or email, and edit the wording with fill-ins ({name}, {job}, {dates}, {arrival}, {crew}, {link}, {review_link}…). Also the **prep guide** (rules for the customer, e.g. move furniture, allow access; trade-specific defaults), the arrival window, and when the reminder goes out.
-- Steps: **Job booked** (lead marked Won), **Work scheduled** (work for the job is scheduled or its time changes, with dates, arrival window and crew), **Day-before reminder** (daily job), **On our way**, **Progress update**, **Job completed** (thank-you + tracked review link; replaces the separate review request).
+- Steps: **Job booked** (lead marked Won), **Work scheduled**, **Visit cancelled** (scheduled work for the job deleted before it happens) (work for the job is scheduled or its time changes, with dates, arrival window and crew), **Day-before reminder** (daily job), **On our way**, **Progress update**, **Job completed** (thank-you + tracked review link; replaces the separate review request).
 - **Customer project page** (`/p/<token>`, private link, no login): status, when the crew arrives and who's coming, the prep checklist, progress updates with photos, a review button when done, and call/text/email buttons.
 - **Add to website**: any progress photo can be copied into the website's Recent projects gallery with one click (owner; edit captions in Social → Project photos).
 - Messages go out through the business's Twilio number and Postmark email and appear in the Inbox. Unchanged message templates aren't stored, so improved defaults reach you.

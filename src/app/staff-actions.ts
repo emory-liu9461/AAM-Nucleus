@@ -10,7 +10,7 @@ import { addDays, atLocal, businessTz } from "@/lib/calendar";
 import { cancelCrewInvites, crewFor, crewFromForm, feedPath, saveCrew } from "@/lib/staff";
 import { emailSettings, postmarkConfigured, postmarkSend } from "@/lib/email";
 import { appBase } from "@/lib/twilio";
-import { sendScheduled } from "@/lib/workflow";
+import { sendScheduled, sendVisitCancelled } from "@/lib/workflow";
 import { advanceStartedJobs, syncJobDates } from "@/lib/jobs";
 
 const { staffMembers, eventStaff, scheduleEvents, jobs } = schema;
@@ -184,7 +184,8 @@ export async function saveWork(slug: string, eventId: string | null, _: FormStat
 
 /** Delete scheduled work; the crew get a cancellation that removes it from their calendars. */
 export async function deleteWork(slug: string, eventId: string) {
-  const { business: b } = await requireBusiness(slug);
+  const { business: b, user } = await requireBusiness(slug);
+  await sendVisitCancelled(b, eventId, { userId: user.id }).catch((e) => console.error("visit cancelled message:", e)); // the customer, if it was still to come
   await cancelCrewInvites(b, eventId);
   const [gone] = await db.delete(scheduleEvents).where(and(eq(scheduleEvents.id, eventId), eq(scheduleEvents.businessId, b.id))).returning({ jobId: scheduleEvents.jobId });
   await syncJobDates(b, gone?.jobId);

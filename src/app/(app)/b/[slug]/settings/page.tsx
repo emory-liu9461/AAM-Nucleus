@@ -4,7 +4,11 @@ import { ActionForm } from "@/components/ActionForm";
 import { ALERT_KINDS, alertSettings } from "@/lib/alerts";
 import { DEFAULT_REVIEW_MESSAGE, reviewSettings } from "@/lib/reviews";
 import { requireBusinessPage } from "@/lib/session";
-import { prettyPhone } from "@/lib/twilio";
+import { appBase, prettyPhone } from "@/lib/twilio";
+import { headers } from "next/headers";
+import { disconnectStripe, savePaymentSettings } from "@/app/payment-actions";
+import { CopyField } from "@/components/CopyField";
+import { stripeKey, stripeWebhookSecret } from "@/lib/stripe";
 
 // Common sales tax on contractor services by province (combined rate). Confirm with your accountant.
 const TAX_PRESETS: [string, string][] = [
@@ -26,6 +30,9 @@ export default async function SettingsPage({ params }: { params: Promise<{ slug:
   const reviews = reviewSettings(b);
   const presetValue = b.taxLabel && b.taxRate ? `${b.taxLabel}|${Number(b.taxRate)}` : "";
   const preset = TAX_PRESETS.some(([v]) => v === presetValue) ? presetValue : b.taxRate ? "custom" : "";
+  const ps = b.paymentSettings ?? {};
+  const key = stripeKey(b);
+  const hookUrl = `${appBase(await headers())}/api/stripe/webhook/${b.id}`;
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -79,6 +86,38 @@ export default async function SettingsPage({ params }: { params: Promise<{ slug:
             <textarea className="input" name="message" rows={3} maxLength={400} defaultValue={b.reviewSettings?.message ?? ""} placeholder={DEFAULT_REVIEW_MESSAGE} />
             <span className="font-normal">Texts end with &ldquo;Reply STOP to opt out.&rdquo; Customers who opted out aren&apos;t texted.</span>
           </label>
+        </ActionForm>
+      </section>
+
+      <section className="card space-y-3" id="payments">
+        <div>
+          <div className="card-title mb-1">Online payments</div>
+          <p className="text-sm text-muted">Every invoice gets a payment page for the customer. Connect this business&apos;s own Stripe account to take cards (money goes straight to that account, minus Stripe&apos;s fee), and add e-Transfer details.</p>
+        </div>
+        <div className={`rounded-lg p-3 text-sm ${key ? "bg-good/10" : "bg-bg"}`}>
+          {key ? (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span>✓ Card payments on: Stripe account <strong>{ps.stripeAccount}</strong>{key.includes("_test_") ? " (test mode)" : ""}{stripeWebhookSecret(b) ? "" : " · add the webhook secret below so payments always get recorded"}</span>
+              <form action={disconnectStripe.bind(null, b.slug)}><button className="text-xs text-muted hover:text-bad">Disconnect</button></form>
+            </div>
+          ) : (
+            <span>Card payments are off. Customers can still see their invoice and your e-Transfer details.</span>
+          )}
+        </div>
+        <ActionForm action={savePaymentSettings.bind(null, b.slug)} submit="Save payments" className="grid gap-3 sm:grid-cols-2">
+          <label className="field sm:col-span-2">Stripe secret key
+            <input className="input font-mono" name="stripeKey" type="password" autoComplete="off" placeholder={key ? "Saved. Paste a new key to replace it." : "sk_live_…"} />
+            <span className="font-normal">Stripe Dashboard → Developers → API keys → Secret key (or a restricted key with Checkout Sessions write access). It&apos;s stored encrypted and never shown again.</span>
+          </label>
+          <div className="field sm:col-span-2">Webhook address (add in Stripe)
+            <CopyField value={hookUrl} />
+            <span className="font-normal">Stripe Dashboard → Developers → Webhooks → Add endpoint: paste this address and choose the events <code>checkout.session.completed</code> and <code>checkout.session.async_payment_succeeded</code>. Then copy its signing secret below.</span>
+          </div>
+          <label className="field sm:col-span-2">Webhook signing secret
+            <input className="input font-mono" name="stripeWebhookSecret" type="password" autoComplete="off" placeholder={stripeWebhookSecret(b) ? "Saved. Paste a new one to replace it." : "whsec_…"} />
+          </label>
+          <label className="field">e-Transfer email<input className="input" name="etransferEmail" type="email" defaultValue={ps.etransferEmail ?? ""} placeholder="payments@yourcompany.ca" /></label>
+          <label className="field">e-Transfer note (optional)<input className="input" name="etransferNote" defaultValue={ps.etransferNote ?? ""} placeholder="Autodeposit is on, no security question needed." /></label>
         </ActionForm>
       </section>
 
