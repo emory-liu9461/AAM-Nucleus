@@ -162,7 +162,7 @@ export function publicSite(b: Business) {
       heroSubheadline: c.heroSubheadline || p.sub,
       about:
         c.about ||
-        `${b.name} is a locally owned ${b.trade.toLowerCase()} company${primaryCity ? ` serving ${primaryCity} and the surrounding area` : ""}. We show up when we say we will, give clear written quotes, keep job sites clean, and stand behind our work.`,
+        `${b.name} is a locally owned ${b.trade.toLowerCase()} company${primaryCity ? ` serving ${primaryCity} and the surrounding area` : ""}. We pride ourselves on quality work first, transparency and service second, and being on time and fairly priced third: clear written quotes, updates with photos as the work goes, clean job sites, and work we stand behind.`,
       yearsInBusiness: c.yearsInBusiness ?? null,
       license: c.license || null,
       insured: c.insured ?? true,

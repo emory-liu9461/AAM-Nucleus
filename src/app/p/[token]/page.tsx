@@ -83,7 +83,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ token:
         {job.status === "completed" ? (
           <section className="card space-y-2">
             <h2 className="font-semibold">Your project is complete 🎉</h2>
-            <p className="text-sm">Thank you for choosing {b.name}. If anything isn&apos;t right, just call or reply to our message and we&apos;ll make it right.</p>
+            <p className="text-sm">Thank you for choosing {b.name}. Our guarantee: if anything isn&apos;t right, tell us within 2 weeks of finishing and we&apos;ll come back and make it right.</p>
             {reviewHref && <a href={reviewHref} className="btn inline-block" style={{ background: b.color }}>Leave us a review</a>}
           </section>
         ) : (

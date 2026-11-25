@@ -99,6 +99,7 @@ Daily jobs: `/api/cron/daily` (Vercel Cron, `CRON_SECRET`) syncs social stats an
 - **Messages & rules** (owner): turn each step on or off, choose text and/or email, and edit the wording with fill-ins ({name}, {job}, {dates}, {arrival}, {crew}, {link}, {review_link}…). Also the **prep guide** (rules for the customer, e.g. move furniture, allow access; trade-specific defaults), the arrival window, and when the reminder goes out.
 - Steps: **Job booked** (lead marked Won), **Work scheduled** (work for the job is scheduled or its time changes, with dates, arrival window and crew), **Day-before reminder** (daily job), **On our way**, **Progress update**, **Job completed** (thank-you + tracked review link; replaces the separate review request).
 - **Customer project page** (`/p/<token>`, private link, no login): status, when the crew arrives and who's coming, the prep checklist, progress updates with photos, a review button when done, and call/text/email buttons.
+- **Add to website**: any progress photo can be copied into the website's Recent projects gallery with one click (owner; edit captions in Social → Project photos).
 - Messages go out through the business's Twilio number and Postmark email and appear in the Inbox. Unchanged message templates aren't stored, so improved defaults reach you.
 
 ## Social stats

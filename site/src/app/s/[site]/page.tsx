@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Areas, CtaBand, Hero, Process, Reviews, Section, ServicesGrid, TrustBar } from "@/components/Sections";
+import { Areas, CtaBand, Hero, Priorities, Process, Reviews, Section, ServicesGrid, TrustBar } from "@/components/Sections";
 import { Icon } from "@/components/Icon";
 import { ProjectGrid } from "@/components/Projects";
 import { getSite } from "@/lib/site";
@@ -37,6 +37,7 @@ export default async function Home({ params }: { params: Promise<{ site: string 
             <Link href="/about" className="inline-flex items-center gap-1 font-semibold text-brand">More about {s.business.name} <Icon name="arrow" className="h-4 w-4" /></Link>
           </div>
           <div className="space-y-6">
+            <Priorities name={s.business.name} />
             {c.serviceAreas.length > 0 && (
               <div className="rounded-xl border border-line p-6">
                 <h3 className="font-bold">Areas we serve</h3>

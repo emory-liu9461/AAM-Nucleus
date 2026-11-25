@@ -642,6 +642,8 @@ export const jobPhotos = pgTable(
       .notNull()
       .references(() => jobs.id, { onDelete: "cascade" }),
     updateId: uuid("update_id").references(() => jobUpdates.id, { onDelete: "cascade" }),
+    // Set when the photo was also added to the website's project gallery.
+    websitePhotoId: uuid("website_photo_id").references(() => projectPhotos.id, { onDelete: "set null" }),
     mime: text("mime").notNull(),
     width: integer("width"),
     height: integer("height"),

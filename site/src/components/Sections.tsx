@@ -9,11 +9,37 @@ export const endpointFor = (s: Site) => (s.business.formKey ? `${nucleusUrl()}/a
 export function trustPoints(s: Site) {
   const c = s.content;
   return [
-    c.license ? { icon: "badge", label: "Licensed", detail: `License ${c.license}` } : { icon: "badge", label: "Licensed", detail: "Fully licensed" },
-    c.insured ? { icon: "shield", label: "Insured", detail: "Fully insured for your protection" } : null,
+    { icon: "badge", label: c.insured ? "Licensed & insured" : "Licensed", detail: [c.license ? `License ${c.license}` : "Fully licensed", c.insured ? "insured for your protection" : ""].filter(Boolean).join(", ") },
+    { icon: "shield", label: "2-week guarantee", detail: "Not satisfied? Tell us within 2 weeks and we'll make it right" },
     { icon: "check", label: "Warranty", detail: c.warranty },
+    { icon: "bolt", label: "Fast response", detail: "Quick replies to every call, text and quote request" },
+    { icon: "chat", label: "Clear communication", detail: "Schedules, updates and photos at every step" },
     c.yearsInBusiness ? { icon: "calendar", label: `${c.yearsInBusiness}+ years`, detail: "Serving our neighbors" } : { icon: "doc", label: "Free quotes", detail: "Clear, written estimates" },
   ].filter(Boolean) as { icon: string; label: string; detail: string }[];
+}
+
+/** What the business puts first, in order (shown on the home and About pages). */
+export const PRIORITIES = [
+  { title: "Quality work", text: "Done right the first time, with careful prep and clean finishes. Not satisfied? Tell us within 2 weeks and we'll make it right." },
+  { title: "Transparency and service", text: "Clear quotes, honest answers, and updates with photos so you always know where things stand." },
+  { title: "On time and fairly priced", text: "We show up when we say we will and stick to the price we agreed." },
+];
+
+export function Priorities({ name }: { name: string }) {
+  return (
+    <div className="rounded-xl border border-line p-6">
+      <h3 className="font-bold">What we stand for</h3>
+      <p className="mt-1 text-sm text-muted">At {name.replace(/\.+$/, "")}, we pride ourselves on these, in this order:</p>
+      <ol className="mt-4 space-y-4">
+        {PRIORITIES.map((p, i) => (
+          <li key={p.title} className="flex gap-3">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">{i + 1}</span>
+            <div><div className="font-semibold">{p.title}</div><div className="text-sm text-muted">{p.text}</div></div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
 }
 
 export function Hero({ site }: { site: Site }) {
@@ -66,7 +92,7 @@ export function PageHero({ eyebrow, title, intro }: { eyebrow?: string; title: s
 export function TrustBar({ site }: { site: Site }) {
   return (
     <section className="border-b border-line">
-      <div className="wrap grid grid-cols-2 gap-6 py-8 lg:grid-cols-4">
+      <div className="wrap grid grid-cols-2 gap-6 py-8 lg:grid-cols-3">
         {trustPoints(site).map((t) => (
           <div key={t.label} className="flex items-start gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand"><Icon name={t.icon} /></span>

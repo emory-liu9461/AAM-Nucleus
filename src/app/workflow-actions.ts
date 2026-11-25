@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { FormState } from "@/app/auth-actions";
 import type { WorkflowSettings } from "@/db/schema";
@@ -77,4 +77,19 @@ export async function deleteUpdate(slug: string, updateId: string) {
   const { business: b } = await requireBusiness(slug);
   await db.delete(jobUpdates).where(and(eq(jobUpdates.id, updateId), eq(jobUpdates.businessId, b.id)));
   refresh(slug);
+}
+
+/** Copy a job's progress photo into the website's project gallery (Social → Project photos). */
+export async function addPhotoToWebsite(slug: string, photoId: string) {
+  const { business: b } = await requireBusiness(slug, "manage_business");
+  const [p] = await db.select().from(jobPhotos).where(and(eq(jobPhotos.id, photoId), eq(jobPhotos.businessId, b.id)));
+  if (!p || p.websitePhotoId) return;
+  const [{ max }] = await db.select({ max: sql<number>`coalesce(max(${schema.projectPhotos.sortOrder}), 0)` }).from(schema.projectPhotos).where(eq(schema.projectPhotos.businessId, b.id));
+  const [row] = await db
+    .insert(schema.projectPhotos)
+    .values({ businessId: b.id, mime: p.mime, bytes: p.bytes, data: p.data, width: p.width, height: p.height, kind: "photo", sortOrder: Number(max) + 1 })
+    .returning({ id: schema.projectPhotos.id });
+  await db.update(jobPhotos).set({ websitePhotoId: row.id }).where(eq(jobPhotos.id, p.id));
+  refresh(slug);
+  revalidatePath("/", "layout");
 }

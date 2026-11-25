@@ -37,7 +37,7 @@ const DEFAULT_MESSAGES: Record<WorkflowStep, string> = {
   reminder: "Hi {name}, a reminder that {business} arrives tomorrow between {arrival}. Please make sure we can get in and the work areas are clear: {link}",
   on_the_way: "Hi {name}, {crew} from {business} {eta}. See you soon!",
   progress: "Update on your {job}: {update} Photos: {link}",
-  completed: "Hi {name}, your {job} is complete! Thank you for choosing {business}. Photos and details: {link}{review_line}",
+  completed: "Hi {name}, your {job} is complete! Thank you for choosing {business}. If anything isn't right, tell us within 2 weeks and we'll make it right. Photos and details: {link}{review_line}",
 };
 
 const PREP_GUIDES: [RegExp, string[]][] = [

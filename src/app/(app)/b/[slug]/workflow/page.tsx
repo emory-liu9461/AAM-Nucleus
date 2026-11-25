@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { deleteUpdate, onTheWay, resendWelcome, saveWorkflowSettings } from "@/app/workflow-actions";
+import { addPhotoToWebsite, deleteUpdate, onTheWay, resendWelcome, saveWorkflowSettings } from "@/app/workflow-actions";
 import { ActionForm } from "@/components/ActionForm";
 import { Badge } from "@/components/Badge";
 import { CopyField } from "@/components/CopyField";
@@ -29,14 +29,14 @@ export default async function WorkflowPage({ params, searchParams }: { params: P
         </div>
         <p className="text-xs text-muted">What your customers hear from you, from booking to review.</p>
       </div>
-      {settingsView ? <Settings b={b} /> : <JobsView b={b} />}
+      {settingsView ? <Settings b={b} /> : <JobsView b={b} owner={owner} />}
     </div>
   );
 }
 
 /* ---------- Jobs: where each customer is in the journey ---------- */
 
-async function JobsView({ b }: { b: Business }) {
+async function JobsView({ b, owner }: { b: Business; owner: boolean }) {
   const tz = businessTz(b);
   const rows = await db
     .select({ job: jobs, contact: contacts })
@@ -49,7 +49,7 @@ async function JobsView({ b }: { b: Business }) {
   const [events, updates, photos, sent] = await Promise.all([
     ids.length ? db.select().from(scheduleEvents).where(inArray(scheduleEvents.jobId, ids)).orderBy(scheduleEvents.startsAt) : [],
     ids.length ? db.select().from(jobUpdates).where(inArray(jobUpdates.jobId, ids)).orderBy(desc(jobUpdates.createdAt)) : [],
-    ids.length ? db.select({ id: jobPhotos.id, jobId: jobPhotos.jobId, updateId: jobPhotos.updateId }).from(jobPhotos).where(inArray(jobPhotos.jobId, ids)) : [],
+    ids.length ? db.select({ id: jobPhotos.id, jobId: jobPhotos.jobId, updateId: jobPhotos.updateId, onWebsite: jobPhotos.websitePhotoId }).from(jobPhotos).where(inArray(jobPhotos.jobId, ids)) : [],
     stepsSent(ids),
   ]);
   const crews = await crewFor(events.map((e) => e.id));
@@ -141,10 +141,19 @@ async function JobsView({ b }: { b: Business }) {
                             </div>
                             <p className="whitespace-pre-line text-muted">{u.kind === "progress" ? u.note : u.message}</p>
                             {pics.length > 0 && (
-                              <div className="flex flex-wrap gap-1.5">
+                              <div className="flex flex-wrap gap-2">
                                 {pics.map((p) => (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img key={p.id} src={`/p/${job.portalToken}/photo/${p.id}`} alt="" className="h-16 w-16 rounded object-cover" />
+                                  <div key={p.id} className="w-20 space-y-1">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={`/p/${job.portalToken}/photo/${p.id}`} alt="" className="h-20 w-20 rounded object-cover" />
+                                    {p.onWebsite ? (
+                                      <div className="text-[11px] text-good">✓ On website</div>
+                                    ) : owner ? (
+                                      <form action={addPhotoToWebsite.bind(null, b.slug, p.id)}>
+                                        <button className="text-[11px] text-accent hover:underline" title="Adds it to Recent projects on your website (edit the caption in Social → Project photos). Make sure the customer is OK with it.">Add to website</button>
+                                      </form>
+                                    ) : null}
+                                  </div>
                                 ))}
                               </div>
                             )}

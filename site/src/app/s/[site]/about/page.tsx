@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Icon } from "@/components/Icon";
-import { Areas, CtaBand, PageHero, Process, trustPoints } from "@/components/Sections";
+import { Areas, CtaBand, PageHero, Priorities, Process, trustPoints } from "@/components/Sections";
 import { getSite } from "@/lib/site";
 
 export const revalidate = 60;
@@ -19,7 +19,10 @@ export default async function About({ params }: Props) {
       <PageHero eyebrow="About us" title={`About ${s.business.name}`} />
       <section className="py-14">
         <div className="wrap grid gap-10 lg:grid-cols-[1fr_380px]">
-          <div className="prose-site text-lg">{c.about.split(/\n+/).map((p, i) => <p key={i}>{p}</p>)}</div>
+          <div className="space-y-8">
+            <div className="prose-site text-lg">{c.about.split(/\n+/).map((p, i) => <p key={i}>{p}</p>)}</div>
+            <Priorities name={s.business.name} />
+          </div>
           <ul className="space-y-3">
             {trustPoints(s).map((t) => (
               <li key={t.label} className="flex gap-3 rounded-lg border border-line p-4">
