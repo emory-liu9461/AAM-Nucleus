@@ -17,11 +17,12 @@ export type Permission =
   | "view_financials" // dashboards, revenue, margins, job costs
   | "manage_invoices" // invoices + payments
   | "manage_business" // business settings, add/archive businesses
-  | "manage_team"; // users + access
+  | "manage_team" // users + access
+  | "manage_staff"; // crew directory (contact details, calendar links)
 
 const ROLE_PERMS: Record<Role, Permission[]> = {
-  owner: ["view_financials", "manage_invoices", "manage_business", "manage_team"],
-  manager: ["view_financials", "manage_invoices"],
+  owner: ["view_financials", "manage_invoices", "manage_business", "manage_team", "manage_staff"],
+  manager: ["view_financials", "manage_invoices", "manage_staff"],
   staff: [],
 };
 

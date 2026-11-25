@@ -92,12 +92,20 @@ async function emailConversation(b: Business, email: string, contact: Contact, l
 }
 
 /** Low-level send through Postmark. Returns the Message-ID header value. */
-export async function postmarkSend(m: { from: string; to: string; replyTo?: string | null; subject: string; text: string; headers?: { Name: string; Value: string }[] }) {
+export async function postmarkSend(m: {
+  from: string;
+  to: string;
+  replyTo?: string | null;
+  subject: string;
+  text: string;
+  headers?: { Name: string; Value: string }[];
+  attachments?: { Name: string; Content: string; ContentType: string }[]; // Content is base64
+}) {
   const api = (process.env.POSTMARK_API_BASE ?? "https://api.postmarkapp.com").replace(/\/$/, "");
   const res = await fetch(`${api}/email`, {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json", "X-Postmark-Server-Token": process.env.POSTMARK_SERVER_TOKEN ?? "" },
-    body: JSON.stringify({ From: m.from, To: m.to, ReplyTo: m.replyTo ?? undefined, Subject: m.subject.slice(0, 200), TextBody: m.text, Headers: m.headers ?? [], MessageStream: "outbound" }),
+    body: JSON.stringify({ From: m.from, To: m.to, ReplyTo: m.replyTo ?? undefined, Subject: m.subject.slice(0, 200), TextBody: m.text, Headers: m.headers ?? [], Attachments: m.attachments?.length ? m.attachments : undefined, MessageStream: "outbound" }),
     signal: AbortSignal.timeout(15000),
   });
   const json = (await res.json().catch(() => ({}))) as { MessageID?: string; ErrorCode?: number; Message?: string };
@@ -180,6 +188,11 @@ export async function handleInboundEmail(b: Business, p: InboundEmail) {
   if (!from) return { replied: false, reason: "no-sender" };
   const s = emailSettings(b);
   const subject = (p.Subject ?? "").trim().slice(0, 200);
+  // A crew member's calendar app answering a work invite: not a customer, so leave it out of the Inbox.
+  if (/^(accepted|declined|tentative|tentatively accepted|new time proposed)\b/i.test(subject)) {
+    const [crew] = await db.select({ id: schema.staffMembers.id }).from(schema.staffMembers).where(and(eq(schema.staffMembers.businessId, b.id), sql`lower(${schema.staffMembers.email}) = ${from}`)).limit(1);
+    if (crew) return { replied: false, reason: "calendar-reply" };
+  }
   const body = (p.StrippedTextReply?.trim() || p.TextBody?.trim() || "").slice(0, 8000);
   const contact = await contactForEmail(b, from, p.FromFull?.Name ?? p.FromName ?? "");
   const lead = await leadForEmail(b, contact, subject);

@@ -20,6 +20,7 @@ import { removeAccount, syncBusinessSocial, upsertAccount, youtubeConfigured } f
 import { findYouTubeChannel } from "@/lib/social-sync/youtube";
 import { saveStats } from "@/lib/social-sync/store";
 import { isValidTimezone } from "@/lib/availability";
+import { cancelCrewInvites } from "@/lib/staff";
 
 // Every action checks the signed-in user's access first. requireBusiness() 404s
 // if the user isn't assigned to that business; the optional permission argument
@@ -244,39 +245,11 @@ export async function voidInvoice(slug: string, invoiceId: string) {
   revalidatePath("/");
 }
 
-/* ---------- schedule (all roles) ---------- */
-
-export async function createEvent(slug: string, form: FormData) {
-  const { business: b, user } = await requireBusiness(slug);
-  const date = req(form, "date");
-  const start = new Date(`${date}T${str(form, "start") ?? "08:00"}`);
-  const end = new Date(`${date}T${str(form, "end") ?? "09:00"}`);
-  if (end <= start) throw new Error("End must be after start");
-  const jobId = str(form, "jobId");
-  let contactId: string | null = null;
-  if (jobId) {
-    const [j] = await db.select({ contactId: jobs.contactId }).from(jobs).where(and(eq(jobs.id, jobId), eq(jobs.businessId, b.id)));
-    if (!j) throw new Error("Job not found");
-    contactId = j.contactId;
-  }
-  await db.insert(scheduleEvents).values({
-    businessId: b.id,
-    jobId,
-    contactId,
-    title: req(form, "title"),
-    type: (str(form, "type") ?? "other") as (typeof schema.eventType.enumValues)[number],
-    startsAt: start,
-    endsAt: end,
-    assignee: str(form, "assignee"),
-    notes: str(form, "notes"),
-    createdById: user.id,
-  });
-  revalidatePath(`/b/${slug}`, "layout");
-  revalidatePath("/");
-}
+/* ---------- schedule (all roles); creating and editing work is in staff-actions.ts ---------- */
 
 export async function deleteEvent(slug: string, eventId: string) {
   const { business: b } = await requireBusiness(slug);
+  await cancelCrewInvites(b, eventId); // anyone on it gets a cancellation
   await db.delete(scheduleEvents).where(and(eq(scheduleEvents.id, eventId), eq(scheduleEvents.businessId, b.id)));
   revalidatePath(`/b/${slug}`, "layout");
   revalidatePath("/");

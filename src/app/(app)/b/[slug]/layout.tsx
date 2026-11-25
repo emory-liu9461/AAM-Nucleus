@@ -11,6 +11,7 @@ const TABS: [string, string, Permission | null][] = [
   ["/jobs", "Jobs", null],
   ["/invoices", "Invoices", "manage_invoices"],
   ["/schedule", "Schedule", null],
+  ["/staff", "Staff", null],
   ["/social", "Social", "manage_business"],
   ["/settings", "Settings", "manage_business"],
 ];

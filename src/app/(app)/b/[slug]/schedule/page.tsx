@@ -1,90 +1,95 @@
+import Link from "next/link";
 import { and, asc, eq, gte, lt, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { createEvent, deleteEvent } from "@/app/actions";
+import { deleteEvent } from "@/app/actions";
 import { getBusiness } from "@/lib/business";
-import { label } from "@/lib/format";
+import { addDays, atLocal, businessTz, fmtTime, fmtYmd, localDay, occurrences, weekStart } from "@/lib/calendar";
+import { crewFor } from "@/lib/staff";
 import { Badge } from "@/components/Badge";
+import { WorkForm } from "@/components/WorkForm";
 
-const { scheduleEvents, jobs, eventType } = schema;
+const { scheduleEvents, jobs, staffMembers } = schema;
 
 export default async function SchedulePage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ week?: string }> }) {
   const [{ slug }, { week = "0" }] = await Promise.all([params, searchParams]);
   const b = await getBusiness(slug);
+  const tz = businessTz(b);
   const offset = Number(week) || 0;
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - ((start.getDay() + 6) % 7) + offset * 7); // Monday
-  const end = new Date(start.getTime() + 7 * 864e5);
+  const monday = weekStart(new Date(), tz, offset);
+  const dayKeys = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+  const start = atLocal(monday, "00:00", tz);
+  const end = atLocal(addDays(monday, 7), "00:00", tz);
+  const today = localDay(new Date(), tz);
 
-  const [events, jobList] = await Promise.all([
+  const [events, jobList, staff] = await Promise.all([
     db
       .select()
       .from(scheduleEvents)
       .where(and(eq(scheduleEvents.businessId, b.id), lt(scheduleEvents.startsAt, end), gte(scheduleEvents.endsAt, start)))
       .orderBy(asc(scheduleEvents.startsAt)),
-    db.select({ id: jobs.id, name: jobs.name }).from(jobs).where(and(eq(jobs.businessId, b.id), sql`${jobs.status} in ('scheduled','in_progress')`)),
+    db.select({ id: jobs.id, name: jobs.name }).from(jobs).where(and(eq(jobs.businessId, b.id), sql`${jobs.status} in ('scheduled','in_progress')`)).orderBy(asc(jobs.name)),
+    db.select().from(staffMembers).where(eq(staffMembers.businessId, b.id)).orderBy(asc(staffMembers.name)),
   ]);
-
-  const days = Array.from({ length: 7 }, (_, i) => new Date(start.getTime() + i * 864e5));
-  const todayKey = new Date().toDateString();
-  const time = (d: Date) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const crews = await crewFor(events.map((e) => e.id));
+  const weekQ = offset ? `week=${offset}&` : "";
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <a className="btn-ghost" href={`?week=${offset - 1}`}>←</a>
+          <a className="btn-ghost" href={`?week=${offset - 1}`} aria-label="Previous week">←</a>
           <a className="btn-ghost" href="?week=0">This week</a>
-          <a className="btn-ghost" href={`?week=${offset + 1}`}>→</a>
+          <a className="btn-ghost" href={`?week=${offset + 1}`} aria-label="Next week">→</a>
           <span className="text-sm font-medium">
-            {start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – {new Date(end.getTime() - 1).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+            {fmtYmd(monday, { month: "short", day: "numeric" })} – {fmtYmd(dayKeys[6], { month: "short", day: "numeric", year: "numeric" })}
           </span>
         </div>
+        <Link className="text-sm text-accent hover:underline" href={`/b/${b.slug}/staff?${weekQ}`}>Crew schedule →</Link>
       </div>
 
       <details className="card">
-        <summary className="cursor-pointer text-sm font-semibold">+ New appointment</summary>
-        <form action={createEvent.bind(null, b.slug)} className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="field lg:col-span-2">Title<input className="input" name="title" required placeholder="Site visit – Smith" /></label>
-          <label className="field">Type
-            <select className="input" name="type" defaultValue="site_visit">
-              {eventType.enumValues.map((t) => <option key={t} value={t}>{label(t)}</option>)}
-            </select>
-          </label>
-          <label className="field">Job (optional)
-            <select className="input" name="jobId" defaultValue="">
-              <option value="">—</option>
-              {jobList.map((j) => <option key={j.id} value={j.id}>{j.name}</option>)}
-            </select>
-          </label>
-          <label className="field">Date<input className="input" type="date" name="date" required /></label>
-          <label className="field">Start<input className="input" type="time" name="start" defaultValue="08:00" /></label>
-          <label className="field">End<input className="input" type="time" name="end" defaultValue="09:00" /></label>
-          <label className="field">Assigned to<input className="input" name="assignee" placeholder="Crew A" /></label>
-          <div className="flex items-end lg:col-start-4"><button className="btn w-full">Add to schedule</button></div>
-        </form>
+        <summary className="cursor-pointer text-sm font-semibold">+ New appointment or work</summary>
+        <div className="mt-4">
+          <WorkForm slug={b.slug} tz={tz} jobs={jobList} staff={staff} defaultDate={dayKeys.includes(today) ? today : monday} />
+        </div>
       </details>
 
       <div className="grid gap-3 md:grid-cols-7">
-        {days.map((d) => {
-          const dayEnd = new Date(d.getTime() + 864e5);
-          const list = events.filter((e) => e.startsAt < dayEnd && e.endsAt > d);
+        {dayKeys.map((d) => {
+          const list = events.flatMap((e) => occurrences(e, tz).filter((o) => o.day === d).map((o) => ({ e, o })));
           return (
-            <div key={d.toISOString()} className={`card min-h-32 p-2 ${d.toDateString() === todayKey ? "border-accent" : ""}`}>
-              <div className="mb-2 text-xs font-semibold text-muted">{d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</div>
+            <div key={d} className={`card min-h-32 p-2 ${d === today ? "border-accent" : ""}`}>
+              <div className="mb-2 text-xs font-semibold text-muted">{fmtYmd(d, { weekday: "short", month: "short", day: "numeric" })}</div>
               <div className="space-y-1.5">
-                {list.map((e) => (
-                  <div key={e.id} className="group rounded-lg border border-line p-1.5 text-xs" style={{ borderLeft: `3px solid ${b.color}` }}>
-                    <div className="font-medium">{e.title}</div>
-                    <div className="text-muted">{e.startsAt.toDateString() === d.toDateString() ? time(e.startsAt) : "cont."}{e.assignee ? ` · ${e.assignee}` : ""}</div>
-                    <div className="mt-1 flex items-center justify-between">
-                      <Badge value={e.type} />
-                      <form action={deleteEvent.bind(null, b.slug, e.id)}>
-                        <button className="hidden text-muted hover:text-bad group-hover:inline" title="Remove">×</button>
-                      </form>
+                {list.map(({ e, o }) => {
+                  const crew = crews.get(e.id) ?? [];
+                  return (
+                    <div key={e.id} className="group rounded-lg border border-line p-1.5 text-xs" style={{ borderLeft: `3px solid ${b.color}` }}>
+                      <Link href={`/b/${b.slug}/staff?${weekQ}edit=${e.id}#edit`} className="font-medium hover:underline">{e.title}</Link>
+                      <div className="text-muted">
+                        {localDay(o.start, tz) === d ? fmtTime(o.start, tz) : "cont."}–{fmtTime(o.end, tz)}
+                        {e.days > 1 ? ` · day ${occurrences(e, tz).findIndex((x) => x.day === d) + 1}/${e.days}` : ""}
+                        {e.assignee && !crew.length ? ` · ${e.assignee}` : ""}
+                      </div>
+                      {crew.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {crew.map((c) => (
+                            <span key={c.staffId} className="inline-flex items-center gap-1 rounded bg-surface px-1" title={c.role ?? undefined}>
+                              <span className="h-1.5 w-1.5 rounded-full" style={{ background: c.color }} />
+                              {c.name.split(" ")[0]}{c.role ? ` · ${c.role}` : ""}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="mt-1 flex items-center justify-between">
+                        <Badge value={e.type} />
+                        <form action={deleteEvent.bind(null, b.slug, e.id)}>
+                          <button className="hidden text-muted hover:text-bad group-hover:inline" title="Remove (the crew get a cancellation)">×</button>
+                        </form>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );

@@ -291,9 +291,59 @@ export const scheduleEvents = pgTable(
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     assignee: text("assignee"),
     notes: text("notes"),
+    // Multi-day work: the same daily hours (startsAt's time to endsAt's time) for this many
+    // days in a row, starting on startsAt's date. endsAt is the end of the last day.
+    days: integer("days").notNull().default(1),
+    // Bumped on every change so calendar apps replace the old copy of an emailed invite.
+    sequence: integer("sequence").notNull().default(0),
     createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
   },
   (t) => [index("events_business_idx").on(t.businessId), index("events_start_idx").on(t.startsAt)],
+);
+
+/*
+ * Crew members (they don't need a Nucleus login). Work assigned to them is emailed as a
+ * calendar invite, and calendarToken is the secret in their personal calendar feed URL.
+ */
+export const staffMembers = pgTable(
+  "staff_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    title: text("title"), // e.g. "Crew lead", "Painter"
+    phone: text("phone"),
+    email: text("email"),
+    color: text("color").notNull().default("#2563eb"),
+    notes: text("notes"),
+    sendInvites: boolean("send_invites").notNull().default(true),
+    active: boolean("active").notNull().default(true),
+    calendarToken: text("calendar_token")
+      .notNull()
+      .unique()
+      .default(sql`replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', '')`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("staff_business_idx").on(t.businessId)],
+);
+
+/** Who is working on each schedule event, in what role, and whether their calendar invite went out. */
+export const eventStaff = pgTable(
+  "event_staff",
+  {
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => scheduleEvents.id, { onDelete: "cascade" }),
+    staffId: uuid("staff_id")
+      .notNull()
+      .references(() => staffMembers.id, { onDelete: "cascade" }),
+    role: text("role"), // their role on this job, e.g. "Driver", "Painter", "Crew lead"
+    invitedAt: timestamp("invited_at", { withTimezone: true }),
+    inviteError: text("invite_error"),
+  },
+  (t) => [primaryKey({ columns: [t.eventId, t.staffId] }), index("event_staff_staff_idx").on(t.staffId)],
 );
 
 /** Editable content for a business's public website. Empty fields fall back to trade defaults. */
@@ -616,6 +666,7 @@ export type Job = typeof jobs.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type ScheduleEvent = typeof scheduleEvents.$inferSelect;
+export type StaffMember = typeof staffMembers.$inferSelect;
 export type ChatConversation = typeof chatConversations.$inferSelect;
 export type InboxMessage = typeof inboxMessages.$inferSelect;
 export type Call = typeof calls.$inferSelect;

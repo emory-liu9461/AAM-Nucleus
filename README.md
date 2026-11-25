@@ -81,6 +81,16 @@ The businesses are branded as **Arcus** (parent brand) plus a trade: Arcus Const
 
 Daily jobs: `/api/cron/daily` (Vercel Cron, `CRON_SECRET`) syncs social stats and sends review reminders.
 
+## Staff and crew scheduling
+
+**Staff** tab (each business): the crew directory, a weekly crew scheduler, and calendar invites.
+
+- **Crew members** don't need a Nucleus login: name, usual role (Painter, Driver, Crew lead…), mobile, email, colour and notes. Owners and managers add and edit them; everyone can see contact details and assign work.
+- **Assign work:** pick a job (or none), first and last day (same hours each day), and up to six crew, each with their **role on that job** (e.g. Oshawa repaint: one Driver, two Painters). A blank role uses the person's usual title. The Schedule tab uses the same form.
+- **Calendar invites:** everyone with an email gets an invite (.ics) from the business email: Gmail and Outlook add it to their calendar, with the address, customer phone, notes, their role and who else is on the job. Changing the time, details or their role sends an update; removing them or deleting the work sends a cancellation. Invite status shows per person. Needs Postmark (same as the Inbox).
+- **Personal calendar feed:** each person has a private link (`/api/public/calendar/<token>.ics`) to subscribe to once in Google Calendar, Outlook or Apple Calendar, so all their work appears and stays up to date. Copy it, use the Add to Google/Outlook buttons, or email it to them; **Make a new link** retires the old one.
+- Times use the business time zone (Settings for the AI assistant's booking hours). Calendar replies ("Accepted: …") from crew are kept out of the Inbox.
+
 ## Social stats
 
 Social → **Social stats** collects reviews, followers, views, likes and comments:
