@@ -3,8 +3,9 @@ import { db, schema } from "@/db";
 import { safeEqual } from "@/lib/auth";
 import { sendReviewReminders } from "@/lib/reviews";
 import { syncBusinessSocial } from "@/lib/social-sync";
+import { sendReminders } from "@/lib/workflow";
 
-/* Daily jobs (Vercel Cron, see vercel.json): social stats sync and review reminders. */
+/* Daily jobs (Vercel Cron, see vercel.json): social stats sync, review reminders and customer "see you tomorrow" reminders. */
 export const maxDuration = 300;
 
 export async function GET(req: Request) {
@@ -16,5 +17,6 @@ export async function GET(req: Request) {
   const social: Record<string, unknown> = {};
   for (const b of list) social[b.id] = await syncBusinessSocial(b);
   const reviews = await sendReviewReminders();
-  return Response.json({ ok: true, social, reviews });
+  const customerReminders = await sendReminders();
+  return Response.json({ ok: true, social, reviews, customerReminders });
 }

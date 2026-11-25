@@ -21,6 +21,7 @@ import { findYouTubeChannel } from "@/lib/social-sync/youtube";
 import { saveStats } from "@/lib/social-sync/store";
 import { isValidTimezone } from "@/lib/availability";
 import { cancelCrewInvites } from "@/lib/staff";
+import { sendCompleted, sendWelcome, workflowSettings } from "@/lib/workflow";
 
 // Every action checks the signed-in user's access first. requireBusiness() 404s
 // if the user isn't assigned to that business; the optional permission argument
@@ -120,7 +121,7 @@ export async function createLead(slug: string, form: FormData) {
 }
 
 export async function setLeadStage(slug: string, leadId: string, form: FormData) {
-  const { business: b } = await requireBusiness(slug);
+  const { business: b, user } = await requireBusiness(slug);
   const stage = req(form, "stage") as (typeof schema.leadStage.enumValues)[number];
   const [lead] = await db
     .update(leads)
@@ -132,14 +133,16 @@ export async function setLeadStage(slug: string, leadId: string, form: FormData)
     const [existing] = await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.leadId, lead.id));
     if (!existing) {
       const [c] = await db.select().from(contacts).where(eq(contacts.id, lead.contactId));
-      await db.insert(jobs).values({
+      const [job] = await db.insert(jobs).values({
         businessId: b.id,
         contactId: lead.contactId,
         leadId: lead.id,
         name: `${lead.title} – ${c?.lastName || c?.firstName || "Customer"}`,
         contractValue: lead.estimatedValue,
-        address: c?.address,
-      });
+        address: [c?.address, c?.city].filter(Boolean).join(", ") || null,
+      }).returning({ id: jobs.id });
+      // Customer workflow: welcome message with their project page (if on).
+      await sendWelcome(b, job.id, { userId: user.id }).catch((e) => console.error("welcome message:", e));
     }
   }
   revalidatePath(`/b/${slug}`, "layout");
@@ -169,10 +172,14 @@ export async function updateJob(slug: string, jobId: string, form: FormData) {
     .update(jobs)
     .set({ ...dates, ...money })
     .where(and(eq(jobs.id, jobId), eq(jobs.businessId, b.id)));
-  // Just finished: ask the customer for a review (if turned on in Settings).
-  if (status === "completed" && before?.status !== "completed" && reviewSettings(b).enabled) {
-    const r = await sendReviewRequest(b, jobId);
-    if ("error" in r && r.error && !r.error.startsWith("A review request was already")) console.error("review request:", r.error);
+  // Just finished: the customer workflow's "completed" message (with the review link), or,
+  // if that's turned off, the plain review request (Settings → Review requests).
+  if (status === "completed" && before?.status !== "completed") {
+    const done = workflowSettings(b).steps.completed.enabled ? await sendCompleted(b, jobId, { userId: user.id }).catch((e) => (console.error("completed message:", e), null)) : null;
+    if (!done && reviewSettings(b).enabled) {
+      const r = await sendReviewRequest(b, jobId);
+      if ("error" in r && r.error && !r.error.startsWith("A review request was already")) console.error("review request:", r.error);
+    }
   }
   revalidatePath(`/b/${slug}`, "layout");
   revalidatePath("/");

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 /** Resizes photos in the browser (max 1600px, JPEG) before uploading, so big phone photos upload fast. */
-async function resize(file: File): Promise<{ blob: Blob; width: number; height: number }> {
+export async function resize(file: File): Promise<{ blob: Blob; width: number; height: number }> {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
   const width = Math.round(bitmap.width * scale);

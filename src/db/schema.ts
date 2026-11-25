@@ -139,6 +139,8 @@ export const businesses = pgTable("businesses", {
   alertSettings: jsonb("alert_settings").$type<AlertSettings>(),
   // Ask happy customers for a review when a job is completed.
   reviewSettings: jsonb("review_settings").$type<ReviewSettings>(),
+  // Customer workflow: automatic messages through a job, and the prep guide.
+  workflowSettings: jsonb("workflow_settings").$type<WorkflowSettings>(),
   // Sales tax added to invoices (e.g. "HST", "13").
   taxLabel: text("tax_label"),
   taxRate: text("tax_rate"),
@@ -226,6 +228,11 @@ export const jobs = pgTable(
     address: text("address"),
     startDate: date("start_date"),
     endDate: date("end_date"),
+    // Secret in the customer's project page link (/p/<token>): schedule, prep guide, progress photos.
+    portalToken: text("portal_token")
+      .notNull()
+      .unique()
+      .default(sql`replace(gen_random_uuid()::text, '-', '')`),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("jobs_business_idx").on(t.businessId)],
@@ -596,6 +603,63 @@ export const reviewRequests = pgTable(
   },
   (t) => [index("review_requests_business_idx").on(t.businessId, t.sentAt), uniqueIndex("review_requests_job").on(t.jobId)],
 );
+
+/*
+ * Customer workflow: each message sent to the customer about a job (welcome, schedule,
+ * reminder, on the way, progress, completed), shown on their project page and in Nucleus.
+ */
+export const jobUpdates = pgTable(
+  "job_updates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    eventId: uuid("event_id").references(() => scheduleEvents.id, { onDelete: "set null" }),
+    kind: text("kind").$type<WorkflowStep | "note">().notNull(),
+    note: text("note"), // the progress update text (progress) or internal note
+    message: text("message"), // what was sent to the customer
+    channels: text("channels"), // "sms,email", empty when nothing could be sent
+    error: text("error"),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("job_updates_job_idx").on(t.jobId, t.createdAt)],
+);
+
+/** Progress photos for a job, shown to the customer on their project page. */
+export const jobPhotos = pgTable(
+  "job_photos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    updateId: uuid("update_id").references(() => jobUpdates.id, { onDelete: "cascade" }),
+    mime: text("mime").notNull(),
+    width: integer("width"),
+    height: integer("height"),
+    bytes: integer("bytes").notNull(),
+    data: bytea("data").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("job_photos_job_idx").on(t.jobId)],
+);
+
+export type WorkflowStep = "welcome" | "scheduled" | "reminder" | "on_the_way" | "progress" | "completed";
+export type WorkflowMessage = { enabled?: boolean; sms?: boolean; email?: boolean; message?: string };
+export type WorkflowSettings = {
+  steps?: Partial<Record<WorkflowStep, WorkflowMessage>>;
+  prepGuide?: string[]; // "before we arrive" rules shown to the customer
+  arrivalWindowMinutes?: number; // crew arrives between start and start + this
+  reminderDaysBefore?: number;
+};
 
 /** Before/after and finished-project photos shown on the business website. */
 export const projectPhotos = pgTable(

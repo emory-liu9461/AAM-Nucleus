@@ -85,6 +85,13 @@
       "when": 1795618151635,
       "tag": "0011_staff",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795618768392,
+      "tag": "0012_customer_workflow",
+      "breakpoints": true
     }
   ]
 }

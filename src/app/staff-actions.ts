@@ -10,6 +10,7 @@ import { addDays, atLocal, businessTz } from "@/lib/calendar";
 import { cancelCrewInvites, crewFor, crewFromForm, feedPath, saveCrew } from "@/lib/staff";
 import { emailSettings, postmarkConfigured, postmarkSend } from "@/lib/email";
 import { appBase } from "@/lib/twilio";
+import { sendScheduled } from "@/lib/workflow";
 
 const { staffMembers, eventStaff, scheduleEvents, jobs } = schema;
 
@@ -162,10 +163,16 @@ export async function saveWork(slug: string, eventId: string | null, _: FormStat
     id = row.id;
   }
   const { sent, problems } = await saveCrew(b, id!, crewFromForm(form), { timeChanged });
+  // Customer workflow: tell the customer when we're coming (new work, or a changed time).
+  let customer = "";
+  if (jobId && (!eventId || timeChanged)) {
+    const r = await sendScheduled(b, id!, { userId: user.id, changed: Boolean(eventId) }).catch((e) => (console.error("scheduled message:", e), null));
+    if (r?.channels.length) customer = ` The customer was told by ${r.channels.join(" and ").replace("sms", "text")}.`;
+  }
   refresh(slug);
   const invites = sent ? ` Calendar invite${sent === 1 ? "" : "s"} sent to ${sent} ${sent === 1 ? "person" : "people"}.` : "";
   const issues = problems.length ? ` Not sent: ${problems.join("; ")}.` : "";
-  return { ok: `${eventId ? "Saved." : "Scheduled."}${invites}${issues}` };
+  return { ok: `${eventId ? "Saved." : "Scheduled."}${invites}${issues}${customer}` };
 }
 
 /** Delete scheduled work; the crew get a cancellation that removes it from their calendars. */
