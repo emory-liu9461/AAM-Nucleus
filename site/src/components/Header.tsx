@@ -21,7 +21,7 @@ export function Header({ site }: { site: Site }) {
         <Link href="/" className="flex min-w-0 flex-1 items-center gap-2.5 lg:flex-none" aria-label={`${b.name} home`}>
           {b.logo ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoSrc(b.logo, dark ? "-white" : "")} alt={b.name} className="h-11 w-auto max-w-full object-contain object-left sm:h-12" />
+            <img src={logoSrc(b, dark ? "-white" : "")} alt={b.name} className="h-11 w-auto max-w-full object-contain object-left sm:h-12" />
           ) : (
             <>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand text-lg font-black text-white">{b.name.trim()[0]}</span>

@@ -1,4 +1,5 @@
 import type { Business, SiteContent, SiteSectionKey, SiteSectionText, SiteTheme } from "@/db/schema";
+import { logoVersion, type LogoVariant } from "./arcus-logo";
 import { slugify } from "./format";
 
 /*
@@ -206,14 +207,31 @@ export const BRAND_LOGOS: { key: string; name: string; accent: string; trade: Re
   { key: "arcus", name: "Arcus (parent brand)", accent: "#1C2B3A", trade: /$^/ },
 ];
 
-/** Chosen logo, or automatic: a business named "Arcus…" gets the logo matching its trade. */
+/**
+ * Chosen logo, or automatic: a business named "Arcus …" gets a logo drawn from its name
+ * ("auto": the arch, ARCUS, and the rest of the name underneath), so renaming the business
+ * renames the logo. A ready-made trade logo can still be picked by hand.
+ */
 export function logoFor(b: Pick<Business, "name" | "trade" | "site">) {
   // Logos saved under an earlier brand name (Credence, Astra, Archen) carry over to the matching Arcus logo.
   const chosen = b.site?.logo?.replace(/^(credence|astra|archen)/, "arcus");
   if (chosen === "none") return null;
   if (chosen && BRAND_LOGOS.some((l) => l.key === chosen)) return chosen;
   if (!/^arcus\b/i.test(b.name.trim())) return null;
-  return BRAND_LOGOS.find((l) => l.trade.test(b.trade) || l.trade.test(b.name))?.key ?? "arcus";
+  return "auto";
+}
+
+/** Keystone / second-line colour for a generated logo: the trade's colour, else the business's brand colour. */
+export function logoAccent(b: Pick<Business, "name" | "trade" | "color">) {
+  return BRAND_LOGOS.find((l) => l.key !== "arcus" && (l.trade.test(b.trade) || l.trade.test(b.name)))?.accent ?? b.color;
+}
+
+/** Where a business's logo image is, in Nucleus (generated logos come from /api/public/logo). */
+export function logoUrl(b: Pick<Business, "slug" | "name" | "trade" | "color" | "site">, variant: LogoVariant = "horizontal") {
+  const key = logoFor(b);
+  if (!key) return null;
+  if (key === "auto") return `/api/public/logo/${b.slug}/${variant}?v=${logoVersion(b.name, logoAccent(b))}`;
+  return `/brand/arcus/${key}${variant === "horizontal" ? "" : variant === "white" ? "-white" : variant === "stacked" ? "-stacked" : "-mark"}.svg`;
 }
 
 /** Everything the public website needs, and nothing private. */
@@ -235,6 +253,9 @@ export function publicSite(b: Business) {
       domain: b.domain,
       formKey: b.formEnabled ? b.formKey : null,
       logo: logoFor(b),
+      // For generated ("auto") logos: the colour to draw with, and a version that changes with the name.
+      logoAccent: logoAccent(b),
+      logoVersion: logoVersion(b.name, logoAccent(b)),
       // Show the AI chat on the website only when it's switched on and an API key is set.
       assistant: Boolean(b.assistant?.enabled && b.formEnabled && process.env.ANTHROPIC_API_KEY),
     },

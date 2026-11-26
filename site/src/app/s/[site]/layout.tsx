@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: { siteName: s.business.name, type: "website" },
     // Preview addresses (no domain yet) shouldn't appear in Google.
     robots: base ? undefined : { index: false, follow: false },
-    icons: s.business.logo ? { icon: logoSrc(s.business.logo, "-mark"), apple: logoSrc(s.business.logo, "-mark") } : undefined,
+    icons: s.business.logo ? { icon: logoSrc(s.business, "-mark"), apple: logoSrc(s.business, "-mark") } : undefined,
   };
 }
 
@@ -35,7 +35,7 @@ export default async function SiteLayout({ children, params }: Props & { childre
     areaServed: s.content.serviceAreas.length ? s.content.serviceAreas.map((a) => ({ "@type": "City", name: a.name })) : s.content.primaryCity || undefined,
     openingHours: undefined,
     sameAs: Object.values(s.content.social).filter(Boolean),
-    logo: s.business.logo && base ? `${base}${logoSrc(s.business.logo)}` : undefined,
+    logo: s.business.logo && base ? `${base}${logoSrc(s.business)}` : undefined,
   };
   return (
     <div style={{ ["--brand" as string]: s.business.color }} className={`site-theme theme-${s.content.theme ?? "classic"} flex min-h-screen flex-col`}>
@@ -45,7 +45,7 @@ export default async function SiteLayout({ children, params }: Props & { childre
       <Footer site={s} />
       <MobileBar site={s} />
       {s.business.assistant && s.business.formKey && (
-        <ChatWidget endpoint={`${nucleusUrl()}/api/public/chat/${s.business.formKey}`} businessName={s.business.name} phone={s.business.phone} logo={s.business.logo ? logoSrc(s.business.logo, "-mark") : null} />
+        <ChatWidget endpoint={`${nucleusUrl()}/api/public/chat/${s.business.formKey}`} businessName={s.business.name} phone={s.business.phone} logo={s.business.logo ? logoSrc(s.business, "-mark") : null} />
       )}
       <TrackAttribution />
       {s.business.formKey && <TrackVisit endpoint={`${nucleusUrl()}/api/public/track/${s.business.formKey}`} />}

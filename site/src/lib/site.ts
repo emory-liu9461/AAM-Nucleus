@@ -30,7 +30,9 @@ export type Site = {
     domain: string | null;
     formKey: string | null;
     assistant?: boolean;
-    logo?: string | null; // e.g. "arcus-painting" -> /brand/arcus/arcus-painting.svg
+    logo?: string | null; // "auto" = drawn from the business name (/logo/<variant>), or e.g. "arcus-painting" -> /brand/arcus/arcus-painting.svg
+    logoAccent?: string;
+    logoVersion?: string;
   };
   content: {
     tagline: string;
@@ -91,5 +93,9 @@ export const SOCIAL_NAMES: [string, string][] = [
   ["homestars", "HomeStars"], ["yelp", "Yelp"], ["angi", "Angi"],
 ];
 
-/** Brand logo files (horizontal logo and square icon) for a logo key. Logos saved under earlier brand names (Credence, Astra, Archen) still in a cache map to Arcus. */
-export const logoSrc = (key: string, variant: "" | "-white" | "-mark" = "") => `/brand/arcus/${key.replace(/^(credence|astra|archen)/, "arcus")}${variant}.svg`;
+/** A business's logo image: generated from its name ("auto"), or a ready-made Arcus file. Logos saved under earlier brand names map to Arcus. */
+export function logoSrc(b: Pick<Site["business"], "logo" | "logoVersion">, variant: "" | "-white" | "-stacked" | "-mark" = "") {
+  if (!b.logo) return "";
+  if (b.logo === "auto") return `/logo/${variant ? variant.slice(1) : "horizontal"}?v=${b.logoVersion ?? ""}`;
+  return `/brand/arcus/${b.logo.replace(/^(credence|astra|archen)/, "arcus")}${variant}.svg`;
+}

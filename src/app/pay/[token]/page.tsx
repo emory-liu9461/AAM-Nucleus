@@ -4,7 +4,7 @@ import { eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { startCardPayment } from "@/app/payment-actions";
 import { cardPaymentsOn, getCheckout, recordCheckout } from "@/lib/stripe";
-import { logoFor } from "@/lib/site-defaults";
+import { logoFor, logoUrl } from "@/lib/site-defaults";
 import { fmtDate, moneyExact } from "@/lib/format";
 
 /* The customer's invoice and payment page (/pay/<token>): pay by card (Stripe) or e-Transfer. */
@@ -56,7 +56,7 @@ export default async function PayPage({ params, searchParams }: { params: Promis
         <div className="mx-auto flex max-w-xl items-center justify-between gap-3 px-4 py-3">
           {logo ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={`/brand/arcus/${logo}.svg`} alt={b.name} className="h-10 w-auto max-w-[60%] object-contain object-left" />
+            <img src={logoUrl(b)!} alt={b.name} className="h-10 w-auto max-w-[60%] object-contain object-left" />
           ) : (
             <span className="text-lg font-bold">{b.name}</span>
           )}

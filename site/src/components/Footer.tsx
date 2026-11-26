@@ -12,7 +12,7 @@ export function Footer({ site }: { site: Site }) {
         <div className="md:col-span-2">
           {b.logo ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoSrc(b.logo)} alt={b.name} className="h-11 w-auto max-w-full object-contain object-left" />
+            <img src={logoSrc(b)} alt={b.name} className="h-11 w-auto max-w-full object-contain object-left" />
           ) : (
             <div className="text-lg font-bold">{b.name}</div>
           )}

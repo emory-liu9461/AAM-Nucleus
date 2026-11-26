@@ -5,7 +5,7 @@ import { db, schema } from "@/db";
 import { businessTz, fmtTime, localDay, occurrences, whenLabel } from "@/lib/calendar";
 import { crewFor } from "@/lib/staff";
 import { arrivalText, workflowSettings } from "@/lib/workflow";
-import { guaranteeDays, guaranteeWithin, logoFor } from "@/lib/site-defaults";
+import { guaranteeDays, guaranteeWithin, logoFor, logoUrl } from "@/lib/site-defaults";
 import { moneyExact } from "@/lib/format";
 import { reviewSettings } from "@/lib/reviews";
 
@@ -63,7 +63,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ token:
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-3">
           {logo ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={`/brand/arcus/${logo}.svg`} alt={b.name} className="h-10 w-auto max-w-[60%] object-contain object-left" />
+            <img src={logoUrl(b)!} alt={b.name} className="h-10 w-auto max-w-[60%] object-contain object-left" />
           ) : (
             <span className="text-lg font-bold">{b.name}</span>
           )}

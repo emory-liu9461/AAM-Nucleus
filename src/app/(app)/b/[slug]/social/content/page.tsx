@@ -2,7 +2,7 @@ import Link from "next/link";
 import { updateSiteContent } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { requireBusinessPage } from "@/lib/session";
-import { BRAND_LOGOS, SECTION_LABELS, SITE_THEMES, logoFor, publicSite, themeForTrade, toLines } from "@/lib/site-defaults";
+import { BRAND_LOGOS, SECTION_LABELS, SITE_THEMES, logoFor, logoUrl, publicSite, themeForTrade, toLines } from "@/lib/site-defaults";
 import type { SiteSectionKey } from "@/db/schema";
 import { websiteBaseUrl } from "@/lib/app-settings";
 
@@ -54,7 +54,7 @@ export default async function SiteContentPage({ params }: { params: Promise<{ sl
         <Card title="Logo">
           <label className="field">Logo shown on the website
             <select className="input" name="logo" defaultValue={c.logo ?? ""}>
-              <option value="">Automatic{autoLogo ? ` (${BRAND_LOGOS.find((l) => l.key === autoLogo)?.name})` : " (business name as text)"}</option>
+              <option value="">Automatic{autoLogo === "auto" ? " (made from the business name)" : autoLogo ? ` (${BRAND_LOGOS.find((l) => l.key === autoLogo)?.name})` : " (business name as text)"}</option>
               {BRAND_LOGOS.map((l) => <option key={l.key} value={l.key}>{l.name}</option>)}
               <option value="none">No logo (business name as text)</option>
             </select>
@@ -63,7 +63,7 @@ export default async function SiteContentPage({ params }: { params: Promise<{ sl
           <div className="flex items-center justify-center rounded-lg border border-line bg-white p-3">
             {currentLogo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={`/brand/arcus/${currentLogo}.svg`} alt="Current logo" className="h-12 w-auto" />
+              <img src={logoUrl(b)!} alt="Current logo" className="h-12 w-auto" />
             ) : (
               <span className="text-sm text-muted">{b.name} (text)</span>
             )}
