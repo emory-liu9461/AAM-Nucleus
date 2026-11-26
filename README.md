@@ -81,6 +81,12 @@ The businesses are branded as **Arcus** (parent brand) plus a trade: Arcus Const
 
 Daily jobs: `/api/cron/daily` (Vercel Cron, `CRON_SECRET`) syncs social stats and sends review reminders.
 
+## Messages (all conversations)
+
+**Messages** in the sidebar (with an unread count): every text, email, website chatbot conversation and call, across all the businesses a person can see. Unread first, then read; filter by Unread/Read, Leads/Customers (a customer has a job or a won lead), method (text, email, chatbot, calls) and business, and sort newest or oldest first. Click any item to see the whole conversation and reply (texts and emails), read the chatbot transcript, or play a voicemail.
+
+Read state is per person (`message_reads`): opening an item marks it read; it becomes unread again when the customer writes (or misses a call / leaves a voicemail) and nobody on the team has replied since. Items older than 30 days count as read unless marked unread. Opening a conversation in a business's Inbox also marks it read.
+
 ## Staff and crew scheduling
 
 **Staff** tab (each business): the crew directory, a weekly crew scheduler, and calendar invites.

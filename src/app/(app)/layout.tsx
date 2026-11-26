@@ -1,6 +1,7 @@
 import { Sidebar } from "@/components/Sidebar";
 import { requireSession } from "@/lib/session";
 import { pendingMigrations } from "@/lib/db-health";
+import { unreadCount } from "@/lib/messages";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +20,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     );
   }
   const { user, businesses } = await requireSession();
+  const unread = await unreadCount(user.id, businesses).catch(() => 0);
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <Sidebar businesses={businesses} user={user} />
+      <Sidebar businesses={businesses} user={user} unread={unread} />
       <main className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
     </div>
   );

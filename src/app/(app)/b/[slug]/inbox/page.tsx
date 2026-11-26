@@ -7,12 +7,14 @@ import { fmtDateTime } from "@/lib/format";
 import { requireBusinessPage } from "@/lib/session";
 import { smsThreads } from "@/lib/sms";
 import { prettyPhone } from "@/lib/twilio";
+import { setRead } from "@/lib/messages";
 
 const AUTHOR: Record<string, string> = { customer: "", assistant: "AI assistant", staff: "Team", system: "Automatic" };
 
 export default async function InboxPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ c?: string; ch?: string }> }) {
   const [{ slug }, { c, ch }] = await Promise.all([params, searchParams]);
-  const { business: b } = await requireBusinessPage(slug);
+  const { business: b, user } = await requireBusinessPage(slug);
+  if (c && /^[0-9a-f-]{36}$/.test(c)) await setRead(user.id, c, true).catch(() => {}); // opening it here counts as read on the Messages page
   const all = await smsThreads(b.id, 100);
   const threads = ch === "sms" || ch === "email" ? all.filter((t) => t.conv.channel === ch) : all;
   const active = threads.find((t) => t.conv.id === c) ?? threads[0];

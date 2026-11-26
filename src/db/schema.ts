@@ -495,6 +495,19 @@ export const calls = pgTable(
   (t) => [index("calls_business_idx").on(t.businessId, t.createdAt)],
 );
 
+/** When each team member last read a conversation or call (the Messages page's read / unread). */
+export const messageReads = pgTable(
+  "message_reads",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    itemId: uuid("item_id").notNull(), // a chat_conversations.id or calls.id
+    readAt: timestamp("read_at", { withTimezone: true }), // null = marked unread
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.itemId] })],
+);
+
 export type EmailSettings = {
   inboundAddress?: string; // address that forwards into Nucleus (e.g. hello@yourcompany.com)
   fromAddress?: string; // replies are sent from this address (verified in Postmark)
