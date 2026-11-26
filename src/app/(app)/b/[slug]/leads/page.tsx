@@ -2,7 +2,8 @@ import Link from "next/link";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { createLead, setLeadStage } from "@/app/actions";
-import { getBusiness } from "@/lib/business";
+import { requireBusinessPage } from "@/lib/session";
+import { messageFeed } from "@/lib/messages";
 import { fmtDate, label, money } from "@/lib/format";
 import { Badge } from "@/components/Badge";
 
@@ -11,7 +12,7 @@ const OPEN = ["new", "contacted", "site_visit", "estimate_sent"] as const;
 
 export default async function LeadsPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ view?: string }> }) {
   const [{ slug }, { view = "open" }] = await Promise.all([params, searchParams]);
-  const b = await getBusiness(slug);
+  const { business: b, user } = await requireBusinessPage(slug);
   const filter =
     view === "won" ? sql`${leads.stage} = 'won'` : view === "lost" ? sql`${leads.stage} = 'lost'` : view === "all" ? sql`true` : sql`${leads.stage} not in ('won','lost')`;
   const rows = await db
@@ -22,6 +23,17 @@ export default async function LeadsPage({ params, searchParams }: { params: Prom
     .where(and(eq(leads.businessId, b.id), filter))
     .orderBy(desc(leads.createdAt))
     .limit(300);
+
+  // Open leads are split into "not replied yet" and "replied" (same rules as the Messages page).
+  const waitingContacts = new Set((await messageFeed(user.id, [b])).filter((i) => i.unread && i.contactId).map((i) => i.contactId));
+  const isOpen = (stage: string) => stage !== "won" && stage !== "lost";
+  const groups: [string | null, typeof rows][] =
+    view === "open"
+      ? [
+          ["Open · not replied yet", rows.filter((r) => waitingContacts.has(r.lead.contactId))],
+          ["Open · replied", rows.filter((r) => !waitingContacts.has(r.lead.contactId))],
+        ]
+      : [[null, rows]];
 
   const stageTotals = await db
     .select({ stage: leads.stage, c: sql<number>`count(*)`, v: sql<number>`coalesce(sum(${leads.estimatedValue}),0)` })
@@ -80,9 +92,17 @@ export default async function LeadsPage({ params, searchParams }: { params: Prom
           </thead>
           <tbody>
             {rows.length === 0 && <tr><td colSpan={7} className="py-8 text-center text-muted">No leads here.</td></tr>}
-            {rows.map(({ lead, first, last, phone, addedBy }) => (
+            {groups.map(([title, list]) => [
+              title && (
+                <tr key={title}>
+                  <td colSpan={7} className={`bg-bg text-xs font-semibold uppercase tracking-wide ${title.includes("not") && list.length ? "text-accent" : "text-muted"}`}>
+                    {title} · {list.length}{title.includes("not") && list.length ? " (texts, emails, forms or calls waiting for your reply)" : ""}
+                  </td>
+                </tr>
+              ),
+              ...list.map(({ lead, first, last, phone, addedBy }) => (
               <tr key={lead.id}>
-                <td><Link href={`/b/${b.slug}/leads/${lead.id}`} className="font-medium hover:text-accent hover:underline">{first} {last}</Link><div className="text-xs text-muted">{phone}</div></td>
+                <td><Link href={`/b/${b.slug}/leads/${lead.id}`} className="font-medium hover:text-accent hover:underline">{isOpen(lead.stage) && waitingContacts.has(lead.contactId) && <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-accent align-middle" title="Not replied yet" />}{first} {last}</Link><div className="text-xs text-muted">{phone}</div></td>
                 <td>
                   {lead.title}
                   {lead.notes && <div className="max-w-xs truncate text-xs text-muted" title={lead.notes}>{lead.notes}</div>}
@@ -107,7 +127,8 @@ export default async function LeadsPage({ params, searchParams }: { params: Prom
                   </form>
                 </td>
               </tr>
-            ))}
+            )),
+            ])}
           </tbody>
         </table>
       </section>

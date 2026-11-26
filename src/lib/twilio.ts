@@ -66,6 +66,23 @@ export async function sendTwilioSms(from: string, to: string, body: string, stat
   return json.sid ?? null;
 }
 
+/** Start a call through Twilio: rings `to`, then runs the TwiML at `url`. Returns the call SID. */
+export async function startTwilioCall(from: string, to: string, url: string, statusCallback: string) {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  if (!sid || !token) throw new Error("Twilio isn't configured (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN)");
+  const api = (process.env.TWILIO_API_BASE ?? "https://api.twilio.com").replace(/\/$/, "");
+  const form = new URLSearchParams({ From: from, To: to, Url: url, StatusCallback: statusCallback, Timeout: "25" });
+  const res = await fetch(`${api}/2010-04-01/Accounts/${sid}/Calls.json`, {
+    method: "POST",
+    headers: { Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}`, "Content-Type": "application/x-www-form-urlencoded" },
+    body: form,
+  });
+  const json = (await res.json().catch(() => ({}))) as { sid?: string; message?: string; code?: number };
+  if (!res.ok) throw new Error(`Twilio ${res.status}${json.code ? ` (${json.code})` : ""}: ${json.message ?? "call failed"}`);
+  return json.sid ?? null;
+}
+
 /** Only fetch recordings from Twilio itself (or the test API base), never an arbitrary URL. */
 export function isTwilioMediaUrl(url: string) {
   try {

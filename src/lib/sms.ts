@@ -93,9 +93,11 @@ export async function smsConversation(b: Business, phone: string, contact: Conta
     .orderBy(desc(chatConversations.updatedAt))
     .limit(1);
   if (existing) {
-    if (!existing.leadId && leadId) {
-      await db.update(chatConversations).set({ leadId }).where(eq(chatConversations.id, existing.id));
-      existing.leadId = leadId;
+    // Re-attach the person (e.g. after their contact was deleted and re-created) and the lead if missing.
+    const patch = { ...(!existing.leadId && leadId ? { leadId } : {}), ...(existing.contactId !== contact.id ? { contactId: contact.id } : {}) };
+    if (Object.keys(patch).length) {
+      await db.update(chatConversations).set(patch).where(eq(chatConversations.id, existing.id));
+      Object.assign(existing, patch);
     }
     return existing;
   }

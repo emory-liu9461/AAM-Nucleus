@@ -83,7 +83,13 @@ export async function emailConversation(b: Business, email: string, contact: Con
     .where(and(eq(chatConversations.businessId, b.id), eq(chatConversations.channel, "email"), eq(chatConversations.address, email), gte(chatConversations.updatedAt, since)))
     .orderBy(desc(chatConversations.updatedAt))
     .limit(1);
-  if (existing) return existing;
+  if (existing) {
+    if (existing.contactId !== contact.id) {
+      await db.update(chatConversations).set({ contactId: contact.id }).where(eq(chatConversations.id, existing.id));
+      existing.contactId = contact.id;
+    }
+    return existing;
+  }
   const [c] = await db
     .insert(chatConversations)
     .values({ businessId: b.id, channel: "email", address: email, token: randomBytes(24).toString("hex"), contactId: contact.id, leadId, attribution: { channel: "chat", formName: "email" } })

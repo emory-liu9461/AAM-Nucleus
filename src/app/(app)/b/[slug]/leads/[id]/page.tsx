@@ -9,6 +9,7 @@ import { can, requireBusinessPage } from "@/lib/session";
 import { transcript } from "@/lib/assistant";
 import { Transcript } from "@/components/Transcript";
 import { ContactActions } from "@/components/ContactActions";
+import { prettyPhone } from "@/lib/twilio";
 
 const { leads, contacts, users, jobs } = schema;
 
@@ -73,7 +74,7 @@ export default async function LeadDetail({ params }: { params: Promise<{ slug: s
       <div className="grid gap-4 lg:grid-cols-3">
         <section className="card space-y-2 text-sm">
           <div className="flex items-center justify-between"><div className="card-title mb-0">Contact</div><Link className="text-xs text-accent hover:underline" href={`/b/${b.slug}/contacts/${c.id}`}>Full profile →</Link></div>
-          <ContactActions slug={b.slug} contact={c} leadId={lead.id} businessName={b.name} />
+          <ContactActions slug={b.slug} contact={c} leadId={lead.id} businessName={b.name} yourPhones={(b.phoneSettings?.forwardTo ?? []).map(prettyPhone)} />
           {(c.address || c.city || c.zip) && <div className="text-muted">{[c.address, c.city, c.zip].filter(Boolean).join(", ")}</div>}
           {c.address && (
             <a className="text-xs text-accent hover:underline" target="_blank" rel="noreferrer"

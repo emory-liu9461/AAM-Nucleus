@@ -490,10 +490,21 @@ export const calls = pgTable(
     recordingUrl: text("recording_url"),
     recordingSeconds: integer("recording_seconds"),
     textedBack: boolean("texted_back").notNull().default(false),
+    // "out" = placed from Nucleus (Call from Nucleus: rings your phone, then the customer, from the business number).
+    direction: text("direction").$type<"in" | "out">().notNull().default("in"),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("calls_business_idx").on(t.businessId, t.createdAt)],
 );
+
+/** "Mark as replied" / "Mark as not replied" for an item, shared by the whole team (a conversation, call or lead id). */
+export const messageHandled = pgTable("message_handled", {
+  itemId: uuid("item_id").primaryKey(),
+  handledAt: timestamp("handled_at", { withTimezone: true }), // null = marked "not replied"
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 /** When each team member last read a conversation or call (the Messages page's read / unread). */
 export const messageReads = pgTable(

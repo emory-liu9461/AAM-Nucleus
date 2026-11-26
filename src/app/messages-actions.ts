@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireSession } from "@/lib/session";
-import { messageFeed, setRead } from "@/lib/messages";
+import { setHandled } from "@/lib/messages";
 
 /** The business a conversation or call belongs to, if this person can see it. */
 async function allowed(itemId: string) {
@@ -17,17 +17,10 @@ async function allowed(itemId: string) {
   return bid && s.businesses.some((b) => b.id === bid) ? s : null;
 }
 
-export async function markMessage(itemId: string, read: boolean) {
+/** Mark something replied (e.g. you called back from your own phone) or not replied, for the whole team. */
+export async function markReplied(itemId: string, replied: boolean) {
   const s = await allowed(itemId);
   if (!s) return;
-  await setRead(s.user.id, itemId, read);
-  revalidatePath("/", "layout");
-}
-
-/** Mark everything currently unread as read (optionally just one business). */
-export async function markAllRead(businessSlug: string | null) {
-  const s = await requireSession();
-  const list = businessSlug ? s.businesses.filter((b) => b.slug === businessSlug) : s.businesses;
-  for (const i of (await messageFeed(s.user.id, list)).filter((x) => x.unread)) await setRead(s.user.id, i.id, true);
+  await setHandled(itemId, s.user.id, replied);
   revalidatePath("/", "layout");
 }

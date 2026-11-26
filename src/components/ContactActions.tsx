@@ -1,15 +1,29 @@
-import { messageContact } from "@/app/actions";
+import { callContact, messageContact } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import type { Contact } from "@/db/schema";
 
 /** Call, and Text / Email the contact from the business (opens a short form), with the phone's own apps as a fallback. */
-export function ContactActions({ slug, contact: c, leadId = null, businessName }: { slug: string; contact: Contact; leadId?: string | null; businessName: string }) {
+export function ContactActions({ slug, contact: c, leadId = null, businessName, yourPhones = [] }: { slug: string; contact: Contact; leadId?: string | null; businessName: string; yourPhones?: string[] }) {
   const digits = (c.phone ?? "").replace(/[^\d+]/g, "");
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
-        {digits && <a className="btn" href={`tel:${digits}`}>Call {c.phone}</a>}
-      </div>
+      {digits && (
+        <details className="group rounded-lg border border-line">
+          <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-sm font-medium">
+            <span>📞 Call {c.phone}</span><span className="text-xs text-muted group-open:hidden">from {businessName}</span>
+          </summary>
+          <div className="space-y-2 border-t border-line p-3">
+            <ActionForm action={callContact.bind(null, slug, c.id)} submit="Call from Nucleus" pendingText="Calling your phone…" className="space-y-2">
+              <label className="field">Ring my phone at
+                <input className="input" name="yourPhone" type="tel" list={`my-phones-${c.id}`} defaultValue={yourPhones[0] ?? ""} placeholder="Your cell" required />
+                <datalist id={`my-phones-${c.id}`}>{yourPhones.map((n) => <option key={n} value={n} />)}</datalist>
+              </label>
+              <p className="text-xs text-muted">Your phone rings first; answer and you&apos;re connected to them from the business number. The call is logged and counts as a reply.</p>
+            </ActionForm>
+            <a className="inline-block text-xs text-muted hover:text-ink" href={`tel:${digits}`}>Or call from your phone directly (not tracked; use &ldquo;Mark as replied&rdquo; after)</a>
+          </div>
+        </details>
+      )}
       {digits && (
         <details className="group rounded-lg border border-line">
           <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-sm font-medium">

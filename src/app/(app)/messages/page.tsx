@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { markAllRead, markMessage } from "@/app/messages-actions";
+import { markReplied } from "@/app/messages-actions";
 import { sendInboxReply } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { Transcript } from "@/components/Transcript";
@@ -12,7 +12,7 @@ import { transcript } from "@/lib/assistant";
 
 /*
  * Every exchange with customers and leads, across all businesses this person can see:
- * texts, emails, website chats (the chatbot) and calls. Unread first, then read.
+ * texts, WhatsApp, emails, website chats (the chatbot), quote forms and calls. Not replied first, then replied.
  */
 
 export const dynamic = "force-dynamic";
@@ -32,7 +32,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
   const all = await messageFeed(user.id, scope);
   const filtered = all.filter(
     (i) =>
-      (q.view === "unread" ? i.unread : q.view === "read" ? !i.unread : true) &&
+      (q.view === "waiting" ? i.unread : q.view === "replied" ? !i.unread : true) &&
       (q.who === "lead" || q.who === "customer" ? i.who === q.who : true) &&
       (q.via && KIND[q.via] ? i.kind === q.via : true),
   );
@@ -60,15 +60,11 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
           <h1 className="text-xl font-semibold">Messages</h1>
           <p className="text-sm text-muted">Every text, WhatsApp message, email, chatbot conversation, website form and call with your leads and customers{businesses.length > 1 ? ", across all businesses" : ""}.</p>
         </div>
-        {totalUnread > 0 && (
-          <form action={markAllRead.bind(null, q.b ?? null)}>
-            <button className="btn-ghost text-sm">Mark all read</button>
-          </form>
-        )}
+
       </div>
 
       <div className="card flex flex-wrap items-center gap-x-5 gap-y-2 p-2 text-sm">
-        <div className="flex flex-wrap gap-1"><Pill k="view" v="" text="All" count={all.length} /><Pill k="view" v="unread" text="Unread" count={totalUnread} /><Pill k="view" v="read" text="Read" /></div>
+        <div className="flex flex-wrap gap-1"><Pill k="view" v="" text="All" count={all.length} /><Pill k="view" v="waiting" text="Not replied" count={totalUnread} /><Pill k="view" v="replied" text="Replied" /></div>
         <div className="flex flex-wrap gap-1"><Pill k="who" v="" text="Everyone" /><Pill k="who" v="lead" text="Leads" /><Pill k="who" v="customer" text="Customers" /></div>
         <div className="flex flex-wrap gap-1"><Pill k="via" v="" text="All methods" /><Pill k="via" v="sms" text="Text" /><Pill k="via" v="whatsapp" text="WhatsApp" /><Pill k="via" v="email" text="Email" /><Pill k="via" v="chat" text="Chatbot" /><Pill k="via" v="form" text="Website form" /><Pill k="via" v="call" text="Calls" /></div>
         <div className="flex flex-wrap gap-1"><Pill k="sort" v="" text="Newest first" /><Pill k="sort" v="old" text="Oldest first" /></div>
@@ -84,12 +80,12 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
         <aside className="card p-0">
           {filtered.length === 0 && <p className="p-4 text-sm text-muted">Nothing here. Texts, WhatsApp messages, emails, website chats, quote forms and calls appear as they come in.</p>}
           <div className="max-h-[75vh] overflow-y-auto">
-            {[["Unread", unread], ["Read", read]].map(([title, list]) =>
+            {[["Not replied", unread], ["Replied", read]].map(([title, list]) =>
               (list as MessageItem[]).length ? (
                 <div key={title as string}>
                   <div className="sticky top-0 z-10 border-b border-line bg-panel px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted">{title as string} · {(list as MessageItem[]).length}</div>
                   <ul className="divide-y divide-line">
-                    {(list as MessageItem[]).map((i) => <Row key={i.id} i={i} active={i.id === q.open} href={`/messages/open/${i.id}${link({ open: undefined })}`} multi={businesses.length > 1} />)}
+                    {(list as MessageItem[]).map((i) => <Row key={i.id} i={i} active={i.id === q.open} href={link({ open: i.id })} multi={businesses.length > 1} />)}
                   </ul>
                 </div>
               ) : null,
@@ -105,10 +101,10 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
 function Row({ i, active, href, multi }: { i: MessageItem; active: boolean; href: string; multi: boolean }) {
   return (
     <li>
-      {/* A plain link on purpose: Next's <Link> pre-loads visible links, which would mark everything read. */}
+      {/* A plain link (no pre-loading). */}
       <a href={href} className={`block px-3 py-2.5 hover:bg-bg ${active ? "bg-bg" : ""}`}>
         <div className="flex items-center gap-2">
-          {i.unread ? <span className="h-2 w-2 shrink-0 rounded-full bg-accent" title="Unread" /> : <span className="w-2 shrink-0" />}
+          {i.unread ? <span className="h-2 w-2 shrink-0 rounded-full bg-accent" title="Not replied yet" /> : <span className="w-2 shrink-0" />}
           <span className={`min-w-0 flex-1 truncate text-sm ${i.unread ? "font-semibold" : ""}`}>{i.name}</span>
           <span className={`rounded px-1.5 text-[10px] font-semibold uppercase ${i.who === "customer" ? "bg-good/15 text-good" : "bg-accent/10 text-accent"}`}>{i.who === "customer" ? "Customer" : "Lead"}</span>
           <span className="text-[11px] text-muted">{fmtDateTime(i.at)}</span>
@@ -137,7 +133,7 @@ async function Detail({ i }: { i: MessageItem }) {
       </div>
       {i.contactId && <Link className="btn-ghost text-xs" href={`/b/${b.slug}/contacts/${i.contactId}`}>Profile</Link>}
       {i.leadId && <Link className="btn-ghost text-xs" href={`/b/${b.slug}/leads/${i.leadId}`}>View lead</Link>}
-      <form action={markMessage.bind(null, i.id, false)}><button className="btn-ghost text-xs">Mark unread</button></form>
+      <form action={markReplied.bind(null, i.id, i.unread)}><button className="btn-ghost text-xs" title={i.unread ? "E.g. you called or replied from your own phone" : undefined}>{i.unread ? "Mark as replied" : "Mark as not replied"}</button></form>
     </header>
   );
 

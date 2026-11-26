@@ -22,7 +22,7 @@ export function Sidebar({ businesses, user, unread = 0 }: { businesses: Business
         )}
         <NavLink href="/messages">
           <span className="w-2.5 text-center text-xs">✉</span> Messages
-          {unread > 0 && <span className="ml-auto rounded-full bg-accent px-1.5 text-[11px] font-semibold leading-5 text-white" title={`${unread} unread`}>{unread > 99 ? "99+" : unread}</span>}
+          {unread > 0 && <span className="ml-auto rounded-full bg-accent px-1.5 text-[11px] font-semibold leading-5 text-white" title={`${unread} not replied yet`}>{unread > 99 ? "99+" : unread}</span>}
         </NavLink>
       </nav>
       <div className="flex flex-col gap-0.5">

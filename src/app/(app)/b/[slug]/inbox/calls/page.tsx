@@ -25,7 +25,7 @@ export default async function CallsPage({ params }: { params: Promise<{ slug: st
   return (
     <section className="card overflow-x-auto p-0">
       <table className="tbl">
-        <thead><tr><th>When</th><th>Caller</th><th>Result</th><th>Length</th><th>Voicemail</th><th>Text-back</th></tr></thead>
+        <thead><tr><th>When</th><th>Caller / called</th><th>Result</th><th>Length</th><th>Voicemail</th><th>Text-back</th></tr></thead>
         <tbody>
           {rows.length === 0 && <tr><td colSpan={6} className="py-8 text-center text-muted">No calls yet.</td></tr>}
           {rows.map(({ call, contact }) => {
@@ -34,10 +34,11 @@ export default async function CallsPage({ params }: { params: Promise<{ slug: st
               <tr key={call.id}>
                 <td className="whitespace-nowrap text-muted">{fmtDateTime(call.createdAt)}</td>
                 <td>
-                  <div className="font-medium">{name && name !== prettyPhone(call.fromNumber) ? name : prettyPhone(call.fromNumber)}</div>
-                  {name && name !== prettyPhone(call.fromNumber) && <div className="text-xs text-muted">{prettyPhone(call.fromNumber)}</div>}
+                  {call.direction === "out" && <div className="text-[10px] font-semibold uppercase tracking-wide text-accent">Outgoing (from Nucleus)</div>}
+                  <div className="font-medium">{(() => { const num = prettyPhone(call.direction === "out" ? call.toNumber : call.fromNumber); return name && name !== num ? name : num; })()}</div>
+                  {name && name !== prettyPhone(call.direction === "out" ? call.toNumber : call.fromNumber) && <div className="text-xs text-muted">{prettyPhone(call.direction === "out" ? call.toNumber : call.fromNumber)}</div>}
                 </td>
-                <td><span className={`pill ${TONE[call.status]}`}>{call.status === "voicemail" ? "Voicemail" : call.status === "missed" ? "Missed" : call.status === "answered" ? "Answered" : "In progress"}</span></td>
+                <td><span className={`pill ${TONE[call.status]}`}>{call.status === "voicemail" ? "Voicemail" : call.status === "missed" ? (call.direction === "out" ? "No answer" : "Missed") : call.status === "answered" ? (call.direction === "out" ? "Connected" : "Answered") : "In progress"}</span></td>
                 <td className="text-muted">{call.durationSec ? `${Math.floor(call.durationSec / 60)}:${String(call.durationSec % 60).padStart(2, "0")}` : "—"}</td>
                 <td>{call.recordingUrl ? <audio controls preload="none" src={`/api/recordings/${call.id}`} className="h-8 w-56" /> : <span className="text-muted">—</span>}</td>
                 <td className="text-muted">{call.textedBack ? <Link className="text-accent hover:underline" href={`/b/${b.slug}/inbox?ch=sms`}>Texted</Link> : "—"}</td>

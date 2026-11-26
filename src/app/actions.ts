@@ -11,9 +11,10 @@ import { BRAND_LOGOS, SITE_THEMES, guaranteeDays, guaranteeLabel, guaranteeWithi
 import type { AlertSettings, AssistantSettings, EmailSettings, PhoneSettings, ReviewSettings, SiteContent, SiteSectionKey, SiteSectionText } from "@/db/schema";
 import { alertSettings, notify } from "@/lib/alerts";
 import { reviewSettings, sendReviewRequest } from "@/lib/reviews";
-import { sendBusinessSms, smsConversation } from "@/lib/sms";
+import { phoneSettings, sendBusinessSms, smsConversation } from "@/lib/sms";
 import { emailConversation, sendBusinessEmail } from "@/lib/email";
-import { toE164 } from "@/lib/twilio";
+import { appBase, startTwilioCall, toE164, twilioConfigured } from "@/lib/twilio";
+import { headers } from "next/headers";
 import { normalizeSiteUrl, websiteBaseUrl } from "@/lib/app-settings";
 import { SOCIAL_CHANNELS, normalizeSocialUrl } from "@/lib/social";
 import { removeAccount, syncBusinessSocial, upsertAccount, youtubeConfigured } from "@/lib/social-sync";
@@ -200,6 +201,37 @@ export async function messageContact(slug: string, contactId: string, leadId: st
   await db.update(chatConversations).set({ aiPaused: true }).where(eq(chatConversations.id, conv.id));
   revalidatePath(`/b/${slug}`, "layout");
   return "error" in r && r.error ? { error: `${r.error} You can still email them from your own email app.` } : { ok: "Email sent from the business address." };
+}
+
+/**
+ * Call from Nucleus: Twilio rings your phone first; when you answer, it calls the customer from
+ * the business number. The call is logged, so the conversation counts as replied.
+ */
+export async function callContact(slug: string, contactId: string, _: { error?: string; ok?: string } | null, form: FormData) {
+  const { business: b, user } = await requireBusiness(slug);
+  const [c] = await db.select().from(contacts).where(and(eq(contacts.id, contactId), eq(contacts.businessId, b.id)));
+  if (!c) return { error: "Contact not found." };
+  const to = toE164(c.phone);
+  if (!to) return { error: "This contact has no valid phone number." };
+  const mine = toE164(str(form, "yourPhone"));
+  if (!mine) return { error: "Enter the phone you want to take the call on." };
+  const from = phoneSettings(b).number;
+  if (!from) return { error: "Set up the business's Twilio number first (Inbox → Settings)." };
+  if (!twilioConfigured()) return { error: "Twilio isn't connected yet. Call from your own phone instead." };
+  const [row] = await db
+    .insert(schema.calls)
+    .values({ businessId: b.id, contactId: c.id, callSid: `pending-${crypto.randomUUID()}`, fromNumber: from, toNumber: to, status: "ringing", direction: "out", userId: user.id })
+    .returning({ id: schema.calls.id });
+  const base = appBase(await headers());
+  try {
+    const sid = await startTwilioCall(from, mine, `${base}/api/twilio/voice/bridge?c=${row.id}`, `${base}/api/twilio/voice/bridge-done?c=${row.id}`);
+    if (sid) await db.update(schema.calls).set({ callSid: sid }).where(eq(schema.calls.id, row.id));
+  } catch (e) {
+    await db.delete(schema.calls).where(eq(schema.calls.id, row.id));
+    return { error: e instanceof Error ? e.message : "Couldn't start the call." };
+  }
+  revalidatePath(`/b/${slug}`, "layout");
+  return { ok: `Calling your phone now. Answer it and you'll be connected to ${c.firstName || "the customer"} from the business number.` };
 }
 
 /* ---------- jobs ---------- */

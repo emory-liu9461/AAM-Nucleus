@@ -75,8 +75,10 @@ export default async function ContactProfile({ params }: { params: Promise<{ slu
       .filter((x) => x.channel === "web" && x.userTurns > 0)
       .map((x) => ({ at: x.createdAt, kind: "Chatbot", dir: "in" as const, title: `Website chat${x.status === "booked" ? " · booked a visit" : x.status === "handoff" ? " · asked for a person" : ""}`, body: x.summary, extra: <details className="mt-1"><summary className="cursor-pointer text-xs text-accent">Show the conversation</summary><Transcript lines={transcript(x.messages)} /></details> })),
     ...callRows.map((x) => ({
-      at: x.createdAt, kind: "Call", dir: "in" as const,
-      title: x.status === "voicemail" ? `Voicemail${x.recordingSeconds ? ` (${x.recordingSeconds}s)` : ""}` : x.status === "missed" ? "Missed call" : `Call${x.durationSec ? ` · ${Math.max(1, Math.round(x.durationSec / 60))} min` : ""}`,
+      at: x.createdAt, kind: "Call", dir: (x.direction === "out" ? "out" : "in") as "in" | "out",
+      title: x.direction === "out"
+        ? `You called them from Nucleus${x.status === "answered" ? `${x.durationSec ? ` · ${Math.max(1, Math.round(x.durationSec / 60))} min` : ""}` : x.status === "missed" ? " · no answer" : ""}`
+        : x.status === "voicemail" ? `Voicemail${x.recordingSeconds ? ` (${x.recordingSeconds}s)` : ""}` : x.status === "missed" ? "Missed call" : `Call${x.durationSec ? ` · ${Math.max(1, Math.round(x.durationSec / 60))} min` : ""}`,
       body: x.textedBack ? "Texted back automatically" : null,
       extra: x.recordingUrl ? <audio controls preload="none" src={`/api/recordings/${x.id}`} className="mt-1 h-8 w-full max-w-sm" /> : null,
     })),
@@ -177,7 +179,7 @@ export default async function ContactProfile({ params }: { params: Promise<{ slu
 
         <aside className="min-w-0 space-y-5">
           <Section title="Get in touch">
-            <ContactActions slug={b.slug} contact={c} leadId={openLeads[0]?.id ?? null} businessName={b.name} />
+            <ContactActions slug={b.slug} contact={c} leadId={openLeads[0]?.id ?? null} businessName={b.name} yourPhones={(b.phoneSettings?.forwardTo ?? []).map(prettyPhone)} />
           </Section>
 
           <Section title="Upcoming visits">

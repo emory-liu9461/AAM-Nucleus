@@ -85,7 +85,9 @@ Daily jobs: `/api/cron/daily` (Vercel Cron, `CRON_SECRET`) syncs social stats an
 
 **Messages** in the sidebar (with an unread count): every text, WhatsApp message, email, website chatbot conversation, website quote form and call, across all the businesses a person can see. Unread first, then read; filter by Unread/Read, Leads/Customers (a customer has a job or a won lead), method (text, email, chatbot, calls) and business, and sort newest or oldest first. Click any item to see the whole conversation and reply (texts and emails), read the chatbot transcript, or play a voicemail.
 
-Read state is per person (`message_reads`): opening an item marks it read; it becomes unread again when the customer writes (or misses a call / leaves a voicemail) and nobody on the team has replied since. Items older than 30 days count as read unless marked unread. Opening a conversation in a business's Inbox also marks it read.
+**Not replied / Replied** (shared by the team): an item stays under Not replied, and in the sidebar count, until someone replies. A reply is any text, WhatsApp or email to that person from Nucleus, a call placed with **Call from Nucleus** that connects, or an AI reply, except when the AI handed off or promised that a person will follow up ("someone will call you shortly"; flagged "AI promised a call back"). Website forms are also replied once the lead moves past New; missed calls and chatbot hand-offs once someone contacts them. **Mark as replied** covers replies made outside Nucleus (e.g. from your cell); **Mark as not replied** puts it back. Items older than 30 days count as replied. The Leads tab's Open view is split into **Open · not replied yet** and **Open · replied** by the same rules.
+
+**Call from Nucleus** (on leads and profiles): Twilio rings your phone first (from the business's ring list, Inbox → Settings), then connects you to the customer from the business number; the call is logged (Inbox → Calls, "Outgoing") and counts as a reply. Twilio reports back to `/api/twilio/voice/bridge` and `/bridge-done`.
 
 ## WhatsApp
 
