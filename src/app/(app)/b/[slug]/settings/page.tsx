@@ -111,7 +111,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ slug:
 
       <section className="card space-y-3" id="payments">
         <div>
-          <div className="card-title mb-1">Online payments</div>
+          <div className="card-title mb-1">Payments and payment instructions</div>
           <p className="text-sm text-muted">Every invoice gets a payment page for the customer. Connect this business&apos;s own Stripe account to take cards (money goes straight to that account, minus Stripe&apos;s fee), and add e-Transfer details.</p>
         </div>
         <div className={`rounded-lg p-3 text-sm ${key ? "bg-good/10" : "bg-bg"}`}>
@@ -138,6 +138,13 @@ export default async function SettingsPage({ params }: { params: Promise<{ slug:
           </label>
           <label className="field">e-Transfer email<input className="input" name="etransferEmail" type="email" defaultValue={ps.etransferEmail ?? ""} placeholder="payments@yourcompany.ca" /></label>
           <label className="field">e-Transfer note (optional)<input className="input" name="etransferNote" defaultValue={ps.etransferNote ?? ""} placeholder="Autodeposit is on, no security question needed." /></label>
+          <p className="text-sm font-semibold sm:col-span-2">Payment instructions on invoices <span className="font-normal text-muted">(each way you fill in is shown on the customer&apos;s invoice; leave blank to hide it)</span></p>
+          <label className="field">Cheques payable to<input className="input" name="chequePayableTo" defaultValue={ps.chequePayableTo ?? ""} placeholder={b.name} /></label>
+          <label className="field">Mail cheques to (optional)<input className="input" name="chequeAddress" defaultValue={ps.chequeAddress ?? ""} placeholder="123 Main St, Oshawa ON L1H 1A1" /></label>
+          <label className="field sm:col-span-2">Cash<input className="input" name="cashNote" defaultValue={ps.cashNote ?? ""} placeholder="Cash accepted in person when the job is done. You'll get a receipt." /></label>
+          <label className="field sm:col-span-2">Other instructions or terms (optional)
+            <textarea className="input min-h-20" name="instructions" defaultValue={ps.instructions ?? ""} placeholder="Payment is due by the date on the invoice. Questions? Call or text us anytime." />
+          </label>
         </ActionForm>
       </section>
 

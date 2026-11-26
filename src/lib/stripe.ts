@@ -85,7 +85,7 @@ export async function recordCheckout(b: Business, s: CheckoutSession) {
   if (!inv) return 0;
   const inserted = await db
     .insert(payments)
-    .values({ businessId: b.id, invoiceId: inv.id, amount: s.amount_total, method: "card", reference: `stripe:${s.id}` })
+    .values({ businessId: b.id, invoiceId: inv.id, amount: s.amount_total, method: "card", reference: `stripe:${s.id}`, confirmedAt: new Date() })
     .onConflictDoNothing()
     .returning({ id: payments.id });
   if (!inserted.length) return 0; // already recorded

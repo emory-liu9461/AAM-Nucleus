@@ -286,32 +286,6 @@ function withTax(subtotal: number, b: { taxRate: string | null; taxLabel: string
   return { subtotal, taxAmount, taxLabel: rate > 0 ? `${b.taxLabel || "Tax"} ${rate}%` : null, amount: subtotal + taxAmount };
 }
 
-export async function recordPayment(slug: string, invoiceId: string, form: FormData) {
-  const { business: b, user } = await requireBusiness(slug, "manage_invoices");
-  const [inv] = await db.select().from(invoices).where(and(eq(invoices.id, invoiceId), eq(invoices.businessId, b.id)));
-  if (!inv) throw new Error("Invoice not found");
-  const amount = dollarsToCents(form.get("amount"));
-  if (amount <= 0) throw new Error("Amount must be positive");
-  await db.insert(payments).values({
-    businessId: b.id,
-    invoiceId: inv.id,
-    amount,
-    method: (str(form, "method") ?? "card") as (typeof schema.paymentMethod.enumValues)[number],
-    reference: str(form, "reference"),
-    createdById: user.id,
-  });
-  const [{ paid }] = await db
-    .select({ paid: sql<number>`coalesce(sum(${payments.amount}),0)` })
-    .from(payments)
-    .where(eq(payments.invoiceId, inv.id));
-  await db
-    .update(invoices)
-    .set({ status: Number(paid) >= inv.amount ? "paid" : "partial" })
-    .where(eq(invoices.id, inv.id));
-  revalidatePath(`/b/${slug}`, "layout");
-  revalidatePath("/");
-}
-
 export async function voidInvoice(slug: string, invoiceId: string) {
   const { business: b } = await requireBusiness(slug, "manage_invoices");
   await db.update(invoices).set({ status: "void" }).where(and(eq(invoices.id, invoiceId), eq(invoices.businessId, b.id)));

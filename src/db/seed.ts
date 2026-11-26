@@ -166,6 +166,7 @@ async function main() {
             amount: paidFully ? inv.amount : Math.round(inv.amount / 2),
             method: inv.amount > 1_000_000 ? "ach" : pick(["card", "ach", "check"] as const),
             receivedAt,
+            confirmedAt: receivedAt,
           });
         }
       }

@@ -6,6 +6,9 @@ import { startCardPayment } from "@/app/payment-actions";
 import { cardPaymentsOn, getCheckout, recordCheckout } from "@/lib/stripe";
 import { logoFor, logoUrl } from "@/lib/site-defaults";
 import { fmtDate, moneyExact } from "@/lib/format";
+import { paymentLabel } from "@/lib/payments";
+import { PrintButton } from "@/components/PrintButton";
+import { asc } from "drizzle-orm";
 
 /* The customer's invoice and payment page (/pay/<token>): pay by card (Stripe) or e-Transfer. */
 
@@ -44,6 +47,7 @@ export default async function PayPage({ params, searchParams }: { params: Promis
     }
   }
   const { inv, b, c } = row;
+  const paidList = await db.select({ amount: payments.amount, method: payments.method, at: payments.receivedAt }).from(payments).where(eq(payments.invoiceId, inv.id)).orderBy(asc(payments.receivedAt));
   const balance = Math.max(0, inv.amount - Number(row.paid));
   const card = cardPaymentsOn(b) && balance > 0 && inv.status !== "void";
   const ps = b.paymentSettings ?? {};
@@ -94,14 +98,45 @@ export default async function PayPage({ params, searchParams }: { params: Promis
           </form>
         )}
 
-        {balance > 0 && inv.status !== "void" && ps.etransferEmail && (
-          <section className="card space-y-1 text-sm">
-            <h2 className="font-semibold">Pay by Interac e-Transfer</h2>
-            <p>Send <strong>{moneyExact(balance)}</strong> to <strong className="break-all">{ps.etransferEmail}</strong> and put <strong>{inv.number}</strong> in the message.</p>
-            {ps.etransferNote && <p className="whitespace-pre-line text-muted">{ps.etransferNote}</p>}
+        {balance > 0 && inv.status !== "void" && (ps.etransferEmail || ps.chequePayableTo || ps.chequeAddress || ps.cashNote) && (
+          <section className="card space-y-4 text-sm">
+            <h2 className="font-semibold">{card ? "Other ways to pay" : "How to pay"}</h2>
+            {ps.etransferEmail && (
+              <div className="space-y-1">
+                <h3 className="font-semibold">Interac e-Transfer</h3>
+                <p>Send <strong>{moneyExact(balance)}</strong> to <strong className="break-all">{ps.etransferEmail}</strong> and put <strong>{inv.number}</strong> in the message.</p>
+                {ps.etransferNote && <p className="whitespace-pre-line text-muted">{ps.etransferNote}</p>}
+              </div>
+            )}
+            {(ps.chequePayableTo || ps.chequeAddress) && (
+              <div className="space-y-1">
+                <h3 className="font-semibold">Cheque</h3>
+                <p>Make it payable to <strong>{ps.chequePayableTo || b.name}</strong> for <strong>{moneyExact(balance)}</strong> and write <strong>{inv.number}</strong> on the memo line.</p>
+                {ps.chequeAddress && <p className="text-muted">Mail to: {ps.chequeAddress}</p>}
+              </div>
+            )}
+            {ps.cashNote && (
+              <div className="space-y-1">
+                <h3 className="font-semibold">Cash</h3>
+                <p className="whitespace-pre-line">{ps.cashNote}</p>
+              </div>
+            )}
           </section>
         )}
-        {balance > 0 && !card && !ps.etransferEmail && <p className="card text-sm">Please contact {b.name}{b.phone ? ` at ${b.phone}` : ""} to arrange payment.</p>}
+        {balance > 0 && !card && !ps.etransferEmail && !ps.chequePayableTo && !ps.chequeAddress && !ps.cashNote && <p className="card text-sm">Please contact {b.name}{b.phone ? ` at ${b.phone}` : ""} to arrange payment.</p>}
+        {ps.instructions && inv.status !== "void" && <p className="card whitespace-pre-line text-sm text-muted">{ps.instructions}</p>}
+
+        {paidList.length > 0 && (
+          <section className="card space-y-2 text-sm">
+            <h2 className="font-semibold">Payments received</h2>
+            <ul className="divide-y divide-line">
+              {paidList.map((p, i) => (
+                <li key={i} className="flex justify-between gap-3 py-1.5"><span>{fmtDate(p.at)} · {paymentLabel(p.method)}</span><span className="font-medium">{moneyExact(p.amount)}</span></li>
+              ))}
+            </ul>
+          </section>
+        )}
+        <div className="flex justify-center print:hidden"><PrintButton label="Print or save this invoice" /></div>
 
         {row.portal && <p className="text-center text-sm"><a className="text-accent hover:underline" href={`/p/${row.portal}`}>See your project page →</a></p>}
         <p className="text-center text-xs text-muted">This page is private to you. Questions about this invoice? Contact {b.name}{b.email ? ` at ${b.email}` : ""}.</p>

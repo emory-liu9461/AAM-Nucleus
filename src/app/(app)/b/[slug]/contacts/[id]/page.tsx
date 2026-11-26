@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { paymentLabel } from "@/lib/payments";
 import { notFound } from "next/navigation";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -86,7 +87,7 @@ export default async function ContactProfile({ params }: { params: Promise<{ slu
     ...updates.map((u) => ({ at: u.createdAt, kind: "Update", dir: "out" as const, title: `${STEPS.find((s) => s.key === u.kind)?.title ?? "Note"} · ${jobRows.find((j) => j.id === u.jobId)?.name ?? ""}${u.channels ? ` · sent by ${u.channels.replace("sms", "text").replace(",", " and ")}` : u.error ? " · not sent" : ""}`, body: u.kind === "progress" ? u.note : u.message })),
     ...leadRows.map((l) => ({ at: l.createdAt, kind: "Inquiry", title: `New inquiry: ${l.title} (${label(l.source)})`, body: l.notes, href: `/b/${b.slug}/leads/${l.id}` })),
     ...jobRows.map((j) => ({ at: j.createdAt, kind: "Job", title: `Job booked: ${j.name}`, body: null })),
-    ...(money ? pays.map((p) => ({ at: p.receivedAt, kind: "Payment", title: `Payment received: ${moneyExact(p.amount)} (${p.method === "ach" ? "e-Transfer / bank" : label(p.method)})`, body: null })) : []),
+    ...(money ? pays.map((p) => ({ at: p.receivedAt, kind: "Payment", title: `Payment received: ${moneyExact(p.amount)} (${paymentLabel(p.method)})`, body: null })) : []),
   ].sort((a, b2) => b2.at.getTime() - a.at.getTime()).slice(0, 250);
 
   return (

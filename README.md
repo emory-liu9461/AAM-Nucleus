@@ -110,6 +110,14 @@ Click a name in Contacts (or **Profile** in Messages, **Full profile** on a lead
 - **Jobs and the schedule are linked:** each job on the Jobs tab shows its scheduled visits and crew (with roles and invite status) and has its own **Assign work** form with the job already picked. A job's start and end dates follow its schedule, and a Scheduled job becomes In progress once its first scheduled work starts (checked when you open the business, and by the daily job).
 - Times use the business time zone (Settings for the AI assistant's booking hours). Calendar replies ("Accepted: …") from crew are kept out of the Inbox.
 
+## Invoices and payments
+
+**Record payment** on an invoice: amount, how it was paid (**Interac e-Transfer, Cash, Cheque, Card, Bank transfer (EFT), Financing or Other**), the date received and a reference or note (cheque number, e-Transfer code). Overpaying or a future date is refused; Other needs a note. Each invoice lists its payments (amount, method, date, who recorded it), with **Remove** to undo a mistake (card payments taken online are refunded in Stripe instead). The invoice moves between Sent, Partial and Paid on its own.
+
+- **Money in this month by method** at the top of Invoices, to match against bank deposits and the cash you were handed.
+- **Cash and cheques to confirm:** when someone other than an owner records cash or a cheque, it waits until an owner clicks **Confirm received**. Owners' own entries and online card payments count as confirmed.
+- **Payment instructions on invoices** (Settings → Payments): e-Transfer email and note, cheques payable to and mailing address, a cash note, and any other terms. The customer's invoice page (`/pay/<token>`) shows each one with the balance and invoice number to quote, lists payments received, and can be printed or saved as a PDF. The invoice text/email names the ways to pay.
+
 ## Quotes
 
 On a lead (owners and managers), **+ New quote** opens the quote builder: **labour** (work, workers, hours each, cost per worker-hour), **materials** (item, units needed, unit, cost per unit; the materials price list in **Settings → Quotes** fills in the unit and cost as you type) and **other costs**. **Profit** is a % margin (share of the price) or a $ amount; an optional **discount** (% or $) comes off the price; the **Tax: on/off** button adds the business's sales tax. Totals (cost, profit with margin and markup, price, discount, tax, total incl. tax) update live and are recomputed on the server.

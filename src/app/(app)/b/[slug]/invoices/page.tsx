@@ -1,26 +1,29 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db, schema } from "@/db";
-import { createInvoice, recordPayment, voidInvoice } from "@/app/actions";
+import { createInvoice, voidInvoice } from "@/app/actions";
 import { requireBusinessPage } from "@/lib/session";
-import { fmtDate, label, money, moneyExact } from "@/lib/format";
+import { fmtDate, fmtDateTime, label, money, moneyExact } from "@/lib/format";
 import { Badge } from "@/components/Badge";
 import { Kpi } from "@/components/Kpi";
 import { CopyButton } from "@/components/CopyButton";
 import { ActionForm } from "@/components/ActionForm";
-import { sendInvoiceLink } from "@/app/payment-actions";
+import { confirmPayment, recordPayment, removePayment, sendInvoiceLink } from "@/app/payment-actions";
+import { HANDED_IN, PAYMENT_METHODS, paymentLabel } from "@/lib/payments";
+import { businessTz } from "@/lib/calendar";
+import { zonedToUtc } from "@/lib/availability";
 import { appBase } from "@/lib/twilio";
 import { cardPaymentsOn } from "@/lib/stripe";
 import { headers } from "next/headers";
 import Link from "next/link";
 
-const { invoices, payments, contacts, jobs, users, paymentMethod } = schema;
-
-// Canadian wording for payment methods ("ach" is stored for any bank transfer).
-const PAYMENT_LABEL: Record<string, string> = { card: "Card", ach: "Bank transfer / e-Transfer", check: "Cheque", cash: "Cash", financing: "Financing" };
+const { invoices, payments, contacts, jobs, users } = schema;
+const confirmer = alias(users, "confirmer");
 
 export default async function InvoicesPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ view?: string }> }) {
   const [{ slug }, { view = "open" }] = await Promise.all([params, searchParams]);
-  const { business: b } = await requireBusinessPage(slug, "manage_invoices");
+  const { business: b, user } = await requireBusinessPage(slug, "manage_invoices");
+  const owner = user.role === "owner";
   const today = new Date().toISOString().slice(0, 10);
   const filter =
     view === "open" ? sql`${invoices.status} in ('sent','partial')`
@@ -51,6 +54,29 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
       ) x`),
   ]);
   const a = (aging as unknown as Record<string, unknown>[])[0] ?? {};
+
+  // Payments on the invoices shown, this month's money in by method, and cash/cheques waiting for an owner.
+  const tz = businessTz(b);
+  const [y, m] = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date()).split("-").map(Number);
+  const monthStart = zonedToUtc(y, m, 1, 0, 0, tz);
+  const monthName = new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString("en-CA", { month: "long", timeZone: "UTC" });
+  const payCols = { p: payments, by: users.name, confirmedBy: confirmer.name };
+  const ids = rows.map((r) => r.inv.id);
+  const [history, byMethod, toConfirm] = await Promise.all([
+    ids.length
+      ? db.select(payCols).from(payments).leftJoin(users, eq(users.id, payments.createdById)).leftJoin(confirmer, eq(confirmer.id, payments.confirmedById)).where(inArray(payments.invoiceId, ids)).orderBy(payments.receivedAt)
+      : Promise.resolve([]),
+    db.select({ method: payments.method, total: sql<number>`sum(${payments.amount})`, n: sql<number>`count(*)` }).from(payments)
+      .where(and(eq(payments.businessId, b.id), sql`${payments.receivedAt} >= ${monthStart.toISOString()}`)).groupBy(payments.method),
+    db.select({ ...payCols, number: invoices.number, first: contacts.firstName, last: contacts.lastName }).from(payments)
+      .innerJoin(invoices, eq(invoices.id, payments.invoiceId)).innerJoin(contacts, eq(contacts.id, invoices.contactId))
+      .leftJoin(users, eq(users.id, payments.createdById)).leftJoin(confirmer, eq(confirmer.id, payments.confirmedById))
+      .where(and(eq(payments.businessId, b.id), sql`${payments.confirmedAt} is null`)).orderBy(payments.receivedAt),
+  ]);
+  const paysFor = (id: string) => history.filter((h) => h.p.invoiceId === id);
+  const monthTotal = byMethod.reduce((n, r) => n + Number(r.total), 0);
+  const methodTotals = PAYMENT_METHODS.map(([k, l]) => ({ k, l, ...(byMethod.find((r) => r.method === k) ?? { total: 0, n: 0 }) })).filter((r) => Number(r.n) > 0);
+  const todayLocal = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date());
   const base = appBase(await headers());
   const cards = cardPaymentsOn(b);
 
@@ -63,9 +89,39 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
         <Kpi label="60+ days overdue" value={money(Number(a.d90 ?? 0))} tone={Number(a.d90) > 0 ? "bad" : undefined} />
       </section>
 
+      <section className="card space-y-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-semibold">Money in, {monthName}</h2>
+          <span className="text-lg font-semibold">{moneyExact(monthTotal)}</span>
+        </div>
+        {methodTotals.length === 0 ? <p className="text-sm text-muted">No payments recorded yet this month.</p> : (
+          <div className="flex flex-wrap gap-2 text-sm">
+            {methodTotals.map((r) => (
+              <span key={r.k} className="rounded-lg border border-line bg-bg px-3 py-1.5"><span className="text-muted">{r.l}</span> <strong>{moneyExact(Number(r.total))}</strong> <span className="text-xs text-muted">({Number(r.n)})</span></span>
+            ))}
+          </div>
+        )}
+        <p className="text-xs text-muted">Match these against your bank deposits and the cash you were handed.</p>
+      </section>
+
+      {toConfirm.length > 0 && (
+        <section className="card space-y-3 border-amber-400/60">
+          <h2 className="font-semibold">Cash and cheques to confirm ({toConfirm.length})</h2>
+          <p className="text-sm text-muted">{owner ? "Recorded by your team. Confirm each one once the money is in your hands or the bank." : "Waiting for an owner to confirm these were handed in."}</p>
+          <ul className="divide-y divide-line text-sm">
+            {toConfirm.map((t) => (
+              <li key={t.p.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <span><strong>{moneyExact(t.p.amount)}</strong> {paymentLabel(t.p.method)} · {t.number} · {t.first} {t.last} · {fmtDate(t.p.receivedAt)} · recorded by {t.by ?? "someone"}{t.p.reference ? ` · ${t.p.reference}` : ""}</span>
+                {owner && <form action={confirmPayment.bind(null, b.slug, t.p.id)}><button className="btn py-1 text-xs">Confirm received</button></form>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {!cards && (
         <p className="card text-sm text-muted">
-          Customers can open each invoice from a link and pay by e-Transfer. To take cards too, connect Stripe in <Link className="text-accent hover:underline" href={`/b/${b.slug}/settings#payments`}>Settings → Online payments</Link>.
+          Customers open each invoice from a link and see how to pay (e-Transfer, cheque, cash). Set those instructions, or connect Stripe to take cards too, in <Link className="text-accent hover:underline" href={`/b/${b.slug}/settings#payments`}>Settings → Payments</Link>.
         </p>
       )}
 
@@ -99,7 +155,7 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
 
       <section className="card overflow-x-auto p-0">
         <table className="tbl">
-          <thead><tr><th>Invoice</th><th>Customer / job</th><th>Issued</th><th>Due</th><th className="text-right">Amount</th><th className="text-right">Balance</th><th>Status</th><th>Customer link</th><th>Record payment</th></tr></thead>
+          <thead><tr><th>Invoice</th><th>Customer / job</th><th>Issued</th><th>Due</th><th className="text-right">Amount</th><th className="text-right">Balance</th><th>Status and payments</th><th>Customer link</th><th>Record payment</th></tr></thead>
           <tbody>
             {rows.length === 0 && <tr><td colSpan={9} className="py-8 text-center text-muted">No invoices here.</td></tr>}
             {rows.map(({ inv, first, last, job, paid, by }) => {
@@ -117,7 +173,27 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
                     {inv.taxAmount > 0 && <div className="text-xs text-muted">incl. {inv.taxLabel} {moneyExact(inv.taxAmount)}</div>}
                   </td>
                   <td className="text-right">{inv.status === "void" ? "—" : moneyExact(balance)}</td>
-                  <td><Badge value={overdue ? "overdue" : inv.status} /></td>
+                  <td className="min-w-56">
+                    <Badge value={overdue ? "overdue" : inv.status} />
+                    {paysFor(inv.id).length > 0 && (
+                      <ul className="mt-1.5 space-y-1 text-xs">
+                        {paysFor(inv.id).map(({ p, by, confirmedBy }) => (
+                          <li key={p.id} className="flex flex-wrap items-center gap-x-1.5">
+                            <span className="font-semibold">{moneyExact(p.amount)}</span>
+                            <span>{paymentLabel(p.method)}</span>
+                            <span className="text-muted">· {fmtDate(p.receivedAt)}{p.reference?.startsWith("stripe:") ? " · paid online" : by ? ` · by ${by}` : ""}</span>
+                            {p.reference && !p.reference.startsWith("stripe:") && <span className="text-muted">· {p.reference}</span>}
+                            {HANDED_IN.includes(p.method) && (p.confirmedAt
+                              ? <span className="text-good" title={`Confirmed ${fmtDateTime(p.confirmedAt)}`}>✓ confirmed{confirmedBy && confirmedBy !== by ? ` by ${confirmedBy}` : ""}</span>
+                              : <span className="rounded bg-amber-400/20 px-1 text-amber-700">to confirm</span>)}
+                            {!p.reference?.startsWith("stripe:") && (owner || (!p.confirmedAt || p.createdById === user.id)) && (
+                              <ActionForm action={removePayment.bind(null, b.slug, p.id)} submit="Remove" pendingText="…" confirm={`Remove the ${moneyExact(p.amount)} ${paymentLabel(p.method)} payment from ${inv.number}?`} className="inline [&_.btn]:border-0 [&_.btn]:bg-transparent [&_.btn]:p-0 [&_.btn]:text-xs [&_.btn]:text-muted [&_.btn]:shadow-none [&_.btn:hover]:text-bad"><span /></ActionForm>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </td>
                   <td>
                     {inv.status !== "void" && (
                       <div className="flex items-center gap-1">
@@ -128,14 +204,20 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
                   </td>
                   <td>
                     {open && (
-                      <div className="flex items-center gap-1">
-                        <form action={recordPayment.bind(null, b.slug, inv.id)} className="flex items-center gap-1">
-                          <input className="input w-24 py-1 text-xs" name="amount" defaultValue={(balance / 100).toFixed(2)} />
-                          <select className="input w-auto py-1 text-xs" name="method" defaultValue={inv.amount > 1_000_000 ? "ach" : "card"}>
-                            {paymentMethod.enumValues.map((m) => <option key={m} value={m}>{PAYMENT_LABEL[m] ?? label(m)}</option>)}
-                          </select>
-                          <button className="btn py-1 text-xs">Paid</button>
-                        </form>
+                      <div className="flex items-start gap-1">
+                        <details className="group">
+                          <summary className="btn cursor-pointer list-none py-1 text-xs">Record payment</summary>
+                          <ActionForm action={recordPayment.bind(null, b.slug, inv.id)} submit="Save payment" pendingText="Saving…" className="mt-2 grid w-64 gap-2 rounded-lg border border-line bg-panel p-3 text-xs [&_.btn]:py-1.5 [&_.btn]:text-xs">
+                            <label className="field">Amount ($)<input className="input py-1 text-sm" name="amount" inputMode="decimal" defaultValue={(balance / 100).toFixed(2)} required /></label>
+                            <label className="field">Paid by
+                              <select className="input py-1 text-sm" name="method" defaultValue="etransfer">
+                                {PAYMENT_METHODS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                              </select>
+                            </label>
+                            <label className="field">Date received<input className="input py-1 text-sm" type="date" name="receivedOn" defaultValue={todayLocal} max={todayLocal} /></label>
+                            <label className="field">Reference or note<input className="input py-1 text-sm" name="reference" placeholder="Cheque #, e-Transfer code…" maxLength={200} /></label>
+                          </ActionForm>
+                        </details>
                         <form action={voidInvoice.bind(null, b.slug, inv.id)}>
                           <button className="btn-ghost py-1 text-xs" title="Void invoice">Void</button>
                         </form>

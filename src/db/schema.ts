@@ -65,6 +65,8 @@ export const paymentMethod = pgEnum("payment_method", [
   "check",
   "cash",
   "financing",
+  "etransfer",
+  "other",
 ]);
 
 export const eventType = pgEnum("event_type", [
@@ -288,8 +290,11 @@ export const payments = pgTable(
     amount: integer("amount").notNull(),
     method: paymentMethod("method").notNull().default("card"),
     receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
-    reference: text("reference"),
+    reference: text("reference"), // cheque number, e-Transfer code, note, or "stripe:<session>"
     createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    // Cash and cheques recorded by someone other than an owner wait for an owner to confirm they were handed in.
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    confirmedById: uuid("confirmed_by_id").references(() => users.id, { onDelete: "set null" }),
   },
   // A Stripe payment ("stripe:<checkout session>") is recorded once, however many times Stripe reports it.
   (t) => [index("payments_business_idx").on(t.businessId), uniqueIndex("payments_stripe_ref").on(t.reference).where(sql`${t.reference} like 'stripe:%'`)],
@@ -809,6 +814,10 @@ export type PaymentSettings = {
   stripeAccount?: string; // account name shown in Nucleus
   etransferEmail?: string;
   etransferNote?: string;
+  chequePayableTo?: string; // shown on invoices: "Make cheques payable to …"
+  chequeAddress?: string; // where to mail cheques
+  cashNote?: string; // e.g. "Cash accepted in person; you'll get a receipt."
+  instructions?: string; // anything else, e.g. terms or late fees
 };
 
 export type AlertSettings = {
