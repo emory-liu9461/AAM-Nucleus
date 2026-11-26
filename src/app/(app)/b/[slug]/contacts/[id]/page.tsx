@@ -6,6 +6,7 @@ import { saveContact } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { Badge } from "@/components/Badge";
 import { Transcript } from "@/components/Transcript";
+import { ContactActions } from "@/components/ContactActions";
 import { fmtDate, fmtDateTime, label, moneyExact } from "@/lib/format";
 import { can, requireBusinessPage } from "@/lib/session";
 import { businessTz, whenLabel } from "@/lib/calendar";
@@ -175,6 +176,10 @@ export default async function ContactProfile({ params }: { params: Promise<{ slu
         </div>
 
         <aside className="min-w-0 space-y-5">
+          <Section title="Get in touch">
+            <ContactActions slug={b.slug} contact={c} leadId={openLeads[0]?.id ?? null} businessName={b.name} />
+          </Section>
+
           <Section title="Upcoming visits">
             {upcoming.length === 0 ? <Empty>Nothing scheduled.</Empty> : (
               <ul className="space-y-2 text-sm">

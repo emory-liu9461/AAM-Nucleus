@@ -45,7 +45,7 @@ export default async function SiteLayout({ children, params }: Props & { childre
       <Footer site={s} />
       <MobileBar site={s} />
       {s.business.assistant && s.business.formKey && (
-        <ChatWidget endpoint={`${nucleusUrl()}/api/public/chat/${s.business.formKey}`} businessName={s.business.name} phone={s.business.phone} />
+        <ChatWidget endpoint={`${nucleusUrl()}/api/public/chat/${s.business.formKey}`} businessName={s.business.name} phone={s.business.phone} logo={s.business.logo ? logoSrc(s.business.logo, "-mark") : null} />
       )}
       <TrackAttribution />
       {s.business.formKey && <TrackVisit endpoint={`${nucleusUrl()}/api/public/track/${s.business.formKey}`} />}

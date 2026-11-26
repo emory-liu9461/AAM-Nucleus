@@ -11,8 +11,8 @@ import { BRAND_LOGOS, SITE_THEMES, guaranteeDays, guaranteeLabel, guaranteeWithi
 import type { AlertSettings, AssistantSettings, EmailSettings, PhoneSettings, ReviewSettings, SiteContent, SiteSectionKey, SiteSectionText } from "@/db/schema";
 import { alertSettings, notify } from "@/lib/alerts";
 import { reviewSettings, sendReviewRequest } from "@/lib/reviews";
-import { sendBusinessSms } from "@/lib/sms";
-import { sendBusinessEmail } from "@/lib/email";
+import { sendBusinessSms, smsConversation } from "@/lib/sms";
+import { emailConversation, sendBusinessEmail } from "@/lib/email";
 import { toE164 } from "@/lib/twilio";
 import { normalizeSiteUrl, websiteBaseUrl } from "@/lib/app-settings";
 import { SOCIAL_CHANNELS, normalizeSocialUrl } from "@/lib/social";
@@ -175,6 +175,31 @@ export async function saveContact(slug: string, contactId: string, _: { error?: 
   if (!row) return { error: "Not found." };
   revalidatePath(`/b/${slug}`, "layout");
   return { ok: "Saved." };
+}
+
+/** Text or email a lead/customer from the business (its Twilio number or business email), logged in their conversation. */
+export async function messageContact(slug: string, contactId: string, leadId: string | null, channel: "sms" | "email", _: { error?: string; ok?: string } | null, form: FormData) {
+  const { business: b, user } = await requireBusiness(slug);
+  const [c] = await db.select().from(contacts).where(and(eq(contacts.id, contactId), eq(contacts.businessId, b.id)));
+  if (!c) return { error: "Contact not found." };
+  const body = (str(form, "body") ?? "").slice(0, channel === "sms" ? 1500 : 20000);
+  if (!body) return { error: "Type a message first." };
+  if (channel === "sms") {
+    const phone = toE164(c.phone);
+    if (!phone) return { error: "This contact has no valid phone number." };
+    const conv = await smsConversation(b, phone, c, leadId);
+    const r = await sendBusinessSms(b, phone, body, { conversationId: conv.id, contactId: c.id, author: "staff", sentById: user.id });
+    await db.update(chatConversations).set({ aiPaused: true }).where(eq(chatConversations.id, conv.id)); // you've taken over
+    revalidatePath(`/b/${slug}`, "layout");
+    return "error" in r && r.error ? { error: `${r.error} You can still text them from your phone.` } : { ok: "Text sent from the business number." };
+  }
+  if (!c.email) return { error: "This contact has no email address." };
+  const subject = (str(form, "subject") ?? `Your request with ${b.name}`).slice(0, 200);
+  const conv = await emailConversation(b, c.email.toLowerCase(), c, leadId);
+  const r = await sendBusinessEmail(b, c.email, subject, body, { conversationId: conv.id, contactId: c.id, author: "staff", sentById: user.id });
+  await db.update(chatConversations).set({ aiPaused: true }).where(eq(chatConversations.id, conv.id));
+  revalidatePath(`/b/${slug}`, "layout");
+  return "error" in r && r.error ? { error: `${r.error} You can still email them from your own email app.` } : { ok: "Email sent from the business address." };
 }
 
 /* ---------- jobs ---------- */

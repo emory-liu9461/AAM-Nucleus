@@ -12,13 +12,14 @@ import { Icon } from "./Icon";
 type Line = { role: "customer" | "assistant" | "booking" | "error"; text: string };
 type Saved = { conversationId?: string; token?: string; lines: Line[] };
 
-export function ChatWidget({ endpoint, businessName, phone }: { endpoint: string; businessName: string; phone: string | null }) {
+export function ChatWidget({ endpoint, businessName, phone, logo }: { endpoint: string; businessName: string; phone: string | null; logo?: string | null }) {
   const storageKey = `nucleus_chat:${endpoint}`;
   const greeting: Line = {
     role: "assistant",
     text: `Hi! I'm the ${businessName} assistant. Ask me anything about our services, or I can book a free site visit for you.`,
   };
   const [open, setOpen] = useState(false);
+  const [teaser, setTeaser] = useState(false);
   const [saved, setSaved] = useState<Saved>({ lines: [] });
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
@@ -32,6 +33,19 @@ export function ChatWidget({ endpoint, businessName, phone }: { endpoint: string
       if (sessionStorage.getItem(storageKey + ":open") === "1") setOpen(true);
     } catch {}
   }, [storageKey]);
+
+  // A friendly greeting pops up once per visit, a few seconds after arriving (not if they've chatted or closed it).
+  useEffect(() => {
+    let seen = false;
+    try { seen = sessionStorage.getItem(storageKey + ":teased") === "1" || Boolean(localStorage.getItem(storageKey)); } catch {}
+    if (seen) return;
+    const t = setTimeout(() => setTeaser(true), 6000);
+    return () => clearTimeout(t);
+  }, [storageKey]);
+  const hideTeaser = () => {
+    setTeaser(false);
+    try { sessionStorage.setItem(storageKey + ":teased", "1"); } catch {}
+  };
 
   const persist = (next: Saved) => {
     setSaved(next);
@@ -83,12 +97,30 @@ export function ChatWidget({ endpoint, businessName, phone }: { endpoint: string
 
   return (
     <>
+      {!open && teaser && (
+        <div role="status" className="fixed bottom-[8.5rem] right-4 z-50 w-64 rounded-2xl rounded-br-md border border-line bg-white p-3 pr-8 text-sm text-ink shadow-xl shadow-slate-900/15 sm:bottom-24 sm:right-6">
+          <button onClick={hideTeaser} aria-label="Dismiss" className="absolute right-2 top-2 rounded p-0.5 text-muted hover:text-ink">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" d="M6 6l12 12M18 6 6 18" /></svg>
+          </button>
+          <button onClick={() => { hideTeaser(); setOpen(true); }} className="text-left">
+            <span className="font-semibold">Hi there 👋</span>
+            <span className="mt-0.5 block text-muted">Questions about a project? Ask here and get an answer in seconds, or book a free visit.</span>
+          </button>
+        </div>
+      )}
       {!open && (
-        <button onClick={() => setOpen(true)} aria-label="Chat with us"
-          className="fixed bottom-20 right-4 z-50 flex items-center gap-2 rounded-full bg-brand px-4 py-3 font-semibold text-white shadow-xl shadow-slate-900/20 transition hover:bg-brand-dark sm:bottom-6 sm:right-6">
+        <button onClick={() => { hideTeaser(); setOpen(true); }} aria-label="Chat with us"
+          className="fixed bottom-20 right-4 z-50 flex items-center gap-2 rounded-full bg-brand py-2 pl-2 pr-4 font-semibold text-white shadow-xl shadow-slate-900/20 transition hover:bg-brand-dark sm:bottom-6 sm:right-6">
+          {logo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logo} alt="" className="h-9 w-9 rounded-full bg-white object-cover ring-2 ring-white/80" />
+          ) : (
+          <span className="flex h-9 w-9 items-center justify-center">
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
           </svg>
+          </span>
+          )}
           <span className="hidden sm:inline">Questions? Chat with us</span>
           <span className="sm:hidden">Chat</span>
         </button>
@@ -98,6 +130,8 @@ export function ChatWidget({ endpoint, businessName, phone }: { endpoint: string
         <section role="dialog" aria-label={`Chat with ${businessName}`}
           className="fixed inset-x-2 bottom-2 top-16 z-50 flex flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-2xl shadow-slate-900/25 sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[600px] sm:max-h-[calc(100vh-3rem)] sm:w-[380px]">
           <header className="flex items-center gap-3 bg-brand px-4 py-3 text-white">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {logo && <img src={logo} alt="" className="h-9 w-9 shrink-0 rounded-full bg-white object-cover" />}
             <div className="min-w-0 flex-1">
               <div className="truncate font-semibold">{businessName}</div>
               <div className="text-xs text-white/80">AI assistant · usually replies in seconds</div>

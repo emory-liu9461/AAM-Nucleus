@@ -8,6 +8,7 @@ import { fmtDate, fmtDateTime, label, money } from "@/lib/format";
 import { can, requireBusinessPage } from "@/lib/session";
 import { transcript } from "@/lib/assistant";
 import { Transcript } from "@/components/Transcript";
+import { ContactActions } from "@/components/ContactActions";
 
 const { leads, contacts, users, jobs } = schema;
 
@@ -49,7 +50,6 @@ export default async function LeadDetail({ params }: { params: Promise<{ slug: s
   ]);
   const a = lead.attribution;
   const intake = INTAKE_LABELS.filter(([k]) => lead.intake?.[k]);
-  const phoneDigits = c.phone?.replace(/[^\d+]/g, "");
 
   return (
     <div className="max-w-5xl space-y-5">
@@ -73,8 +73,7 @@ export default async function LeadDetail({ params }: { params: Promise<{ slug: s
       <div className="grid gap-4 lg:grid-cols-3">
         <section className="card space-y-2 text-sm">
           <div className="flex items-center justify-between"><div className="card-title mb-0">Contact</div><Link className="text-xs text-accent hover:underline" href={`/b/${b.slug}/contacts/${c.id}`}>Full profile →</Link></div>
-          {c.phone && <div className="flex gap-2"><a className="btn" href={`tel:${phoneDigits}`}>Call {c.phone}</a><a className="btn-ghost" href={`sms:${phoneDigits}`}>Text</a></div>}
-          {c.email && <div><a className="text-accent hover:underline" href={`mailto:${c.email}`}>{c.email}</a></div>}
+          <ContactActions slug={b.slug} contact={c} leadId={lead.id} businessName={b.name} />
           {(c.address || c.city || c.zip) && <div className="text-muted">{[c.address, c.city, c.zip].filter(Boolean).join(", ")}</div>}
           {c.address && (
             <a className="text-xs text-accent hover:underline" target="_blank" rel="noreferrer"

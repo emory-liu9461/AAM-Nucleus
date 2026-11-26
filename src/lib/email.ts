@@ -75,7 +75,7 @@ async function leadForEmail(b: Business, contact: Contact, subject: string) {
   return { id: l.id, created: true };
 }
 
-async function emailConversation(b: Business, email: string, contact: Contact, leadId: string): Promise<ChatConversation> {
+export async function emailConversation(b: Business, email: string, contact: Contact, leadId: string | null): Promise<ChatConversation> {
   const since = new Date(Date.now() - 30 * 864e5);
   const [existing] = await db
     .select()
