@@ -32,7 +32,7 @@ export function trustPoints(s: Site) {
   return list.map((t) => ({ icon: trustIcon(t.label), label: t.label, detail: t.detail }));
 }
 
-const DEFAULT_PRIORITIES = [
+export const DEFAULT_PRIORITIES = [
   { title: "Quality work", text: "Done right the first time, with careful prep and clean finishes." },
   { title: "Transparency and service", text: "Clear quotes, honest answers, and updates so you always know where things stand." },
   { title: "On time and fairly priced", text: "We show up when we say we will and stick to the price we agreed." },
@@ -116,7 +116,7 @@ export function serviceIcon(name: string, trade: string) {
 
 export function PageHero({ eyebrow, title, intro }: { eyebrow?: string; title: string; intro?: string }) {
   return (
-    <section className="border-b border-line bg-brand-soft">
+    <section className="page-hero border-b border-line bg-brand-soft">
       <div className="wrap py-12 sm:py-16">
         {eyebrow && <p className="eyebrow">{eyebrow}</p>}
         <h1 className="mt-2 max-w-3xl text-4xl font-extrabold tracking-tight sm:text-5xl">{title}</h1>
@@ -158,13 +158,13 @@ export function ServicesGrid({ site, limit }: { site: Site; limit?: number }) {
   );
 }
 
-const DEFAULT_PROCESS = [
+export const DEFAULT_PROCESS = [
   { title: "Request a quote", text: "Tell us about your project online or by phone." },
   { title: "Site visit", text: "We visit, measure and talk through your options." },
   { title: "Clear estimate", text: "A written, itemized price, with no surprises." },
   { title: "Quality work", text: "We do the job right, clean up, and stand behind it." },
 ];
-const STEP_ICONS = ["doc", "calendar", "dollar", "check", "wrench", "home", "star", "shield"];
+export const STEP_ICONS = ["doc", "calendar", "dollar", "check", "wrench", "home", "star", "shield"];
 
 export function Process({ site }: { site: Site }) {
   const sec = section(site, "process", { eyebrow: "How it works", title: "Simple from first call to final walkthrough", intro: "" });

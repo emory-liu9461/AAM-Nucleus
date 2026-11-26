@@ -105,3 +105,20 @@ body {
 }
 .theme-modern :is(h1, h2, .h2) { font-weight: 800; letter-spacing: -0.02em; }
 .theme-modern main .rounded-xl.border { box-shadow: 0 10px 30px -18px rgb(15 23 42 / 0.25); border-color: transparent; }
+
+.font-head { font-family: var(--font-head); }
+
+/* Inner-page banners and footers follow the theme too. */
+.page-hero { color: var(--ink); }
+.theme-bold .page-hero { --ink: #fff; --muted: rgb(255 255 255 / 0.72); background: #0f1115; border-bottom: 4px solid var(--brand); }
+.theme-bold .page-hero .eyebrow { color: color-mix(in oklab, var(--brand) 55%, white); }
+.theme-bold .site-footer { --ink: #fff; --muted: rgb(255 255 255 / 0.6); --line: rgb(255 255 255 / 0.12); --surface: #0f1115; color: #fff; border-top: 4px solid var(--brand); }
+.theme-fresh .page-hero { text-align: center; border-bottom: 0; border-radius: 0 0 2.5rem 2.5rem; }
+.theme-fresh .page-hero :is(h1, .lead) { margin-left: auto; margin-right: auto; }
+.theme-fresh .site-footer { border-top: 0; border-radius: 2.5rem 2.5rem 0 0; background: var(--brand-soft); }
+.theme-elegant .page-hero { background: var(--surface); text-align: center; }
+.theme-elegant .page-hero :is(h1, .lead) { margin-left: auto; margin-right: auto; }
+.theme-elegant .page-hero h1::before { content: ""; display: block; width: 4rem; height: 1px; background: var(--brand); margin: 0 auto 1.5rem; }
+.theme-modern .page-hero { --ink: #fff; --muted: rgb(255 255 255 / 0.8); background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 55%, #0b1220 100%); border-bottom: 0; }
+.theme-modern .page-hero .eyebrow { color: rgb(255 255 255 / 0.75); }
+@media (min-width: 1024px) { .theme-fresh .page-hero { margin-top: -5.5rem; padding-top: 5.5rem; } }

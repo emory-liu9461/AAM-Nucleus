@@ -128,7 +128,17 @@ Every invoice has a private payment page (`/pay/<token>`): the invoice with tax,
 
 ## Website themes
 
-Social → Edit website content → **Theme**: Classic, Bold (dark header and top section, condensed capitals, square corners), Fresh (rounded font, pill buttons, soft tints), Elegant (serif headings, warm cream) or Modern (geometric font, gradient top section). **Automatic** picks by trade (roofing/concrete → Bold, cleaning/landscaping → Fresh, painting → Elegant, renovations/construction → Modern), so sister businesses don't look alike. Fonts are self-hosted in `site/public/fonts` (SIL Open Font License, subset to Latin).
+Social → Edit website content → **Theme**. Each theme has its own header, homepage layout, inner-page banner and footer, not just fonts and colours:
+
+| Theme | Header | Homepage |
+|---|---|---|
+| **Classic** | Logo left, links right | Split hero with the quote form beside it, trust bar, card grids, colour CTA band |
+| **Bold** | Brand info strip + dark bar, condensed capitals | Full-bleed dark hero over your best photo, trust blocks, big numbered service rows, edge-to-edge photos, process on a brand band, featured review, dark quote section with a big phone number and the form |
+| **Fresh** | Floating rounded bar with pill links | Centred hero with trust pills and the form under it, wave edge, round icon tiles, dotted-line steps, speech-bubble reviews, rounded CTA card |
+| **Elegant** | Centred logo, spaced small-caps menu | Editorial hero with a framed photo (or your promise), about as a centred essay, roman-numeral service index, portfolio with one large photo, one big testimonial, consultation section |
+| **Modern** | Glassy bar, links in a pill | Gradient hero, form card floating over its edge with trust cards beside it, bento services, big-number stats, swipeable photos, timeline, masonry reviews, gradient CTA card |
+
+**Automatic** picks by trade (roofing/concrete → Bold, cleaning/landscaping → Fresh, painting → Elegant, renovations/construction → Modern), so sister businesses don't look alike. All themes use the same content and Page sections switches. Fonts are self-hosted in `site/public/fonts` (SIL Open Font License, subset to Latin).
 
 ## Website page sections
 

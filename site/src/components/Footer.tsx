@@ -7,12 +7,12 @@ export function Footer({ site }: { site: Site }) {
   const { business: b, content: c } = site;
   const year = new Date().getFullYear();
   return (
-    <footer className="border-t border-line bg-surface pb-24 pt-14 sm:pb-10">
+    <footer className="site-footer border-t border-line bg-surface pb-24 pt-14 sm:pb-10">
       <div className="wrap grid gap-10 md:grid-cols-4">
         <div className="md:col-span-2">
           {b.logo ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoSrc(b)} alt={b.name} className="h-11 w-auto max-w-full object-contain object-left" />
+            <img src={logoSrc(b, c.theme === "bold" ? "-white" : "")} alt={b.name} className="h-11 w-auto max-w-full object-contain object-left" />
           ) : (
             <div className="text-lg font-bold">{b.name}</div>
           )}
