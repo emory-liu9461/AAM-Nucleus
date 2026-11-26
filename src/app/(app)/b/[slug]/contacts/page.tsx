@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { getBusiness } from "@/lib/business";
@@ -37,7 +38,7 @@ export default async function ContactsPage({ params, searchParams }: { params: P
             {rows.length === 0 && <tr><td colSpan={8} className="py-8 text-center text-muted">No contacts found.</td></tr>}
             {rows.map(({ c, jobsCount, lifetime }) => (
               <tr key={c.id}>
-                <td className="font-medium">{c.firstName} {c.lastName}</td>
+                <td className="font-medium"><Link className="hover:underline" href={`/b/${b.slug}/contacts/${c.id}`}>{c.firstName} {c.lastName}</Link></td>
                 <td>{c.phone}</td>
                 <td className="text-muted">{c.email}</td>
                 <td className="text-muted">{[c.address, c.city].filter(Boolean).join(", ")}</td>

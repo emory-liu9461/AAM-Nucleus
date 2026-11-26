@@ -135,6 +135,7 @@ async function Detail({ i }: { i: MessageItem }) {
         </div>
         <div className="text-xs text-muted">{KIND[i.kind]} · {i.sub} · <span style={{ color: b.color }}>●</span> {b.name}</div>
       </div>
+      {i.contactId && <Link className="btn-ghost text-xs" href={`/b/${b.slug}/contacts/${i.contactId}`}>Profile</Link>}
       {i.leadId && <Link className="btn-ghost text-xs" href={`/b/${b.slug}/leads/${i.leadId}`}>View lead</Link>}
       <form action={markMessage.bind(null, i.id, false)}><button className="btn-ghost text-xs">Mark unread</button></form>
     </header>

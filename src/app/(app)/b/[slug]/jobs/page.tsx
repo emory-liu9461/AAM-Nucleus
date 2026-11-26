@@ -55,7 +55,7 @@ export default async function JobsPage({ params, searchParams }: { params: Promi
           return (
             <details key={job.id} className="card">
               <summary className="flex cursor-pointer flex-wrap items-center gap-x-4 gap-y-1">
-                <span className="min-w-0 flex-1 font-medium">{job.name}<span className="ml-2 text-xs font-normal text-muted">{first} {last}</span></span>
+                <span className="min-w-0 flex-1 font-medium">{job.name}<a className="ml-2 text-xs font-normal text-muted hover:underline" href={`/b/${b.slug}/contacts/${job.contactId}`}>{first} {last}</a></span>
                 <Badge value={job.status} />
                 {money && <span className="text-sm">{fmtMoney(job.contractValue)}</span>}
                 {money && <span className="text-xs text-muted">Billed {fmtMoney(Number(invoiced))} · Paid {fmtMoney(Number(paid))} · Margin {pct(margin)}{job.actualCost ? "" : " (est.)"}</span>}

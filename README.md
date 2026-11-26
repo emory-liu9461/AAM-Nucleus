@@ -87,6 +87,10 @@ Daily jobs: `/api/cron/daily` (Vercel Cron, `CRON_SECRET`) syncs social stats an
 
 Read state is per person (`message_reads`): opening an item marks it read; it becomes unread again when the customer writes (or misses a call / leaves a voicemail) and nobody on the team has replied since. Items older than 30 days count as read unless marked unread. Opening a conversation in a business's Inbox also marks it read.
 
+## Lead and customer profiles
+
+Click a name in Contacts (or **Profile** in Messages, **Full profile** on a lead, the customer's name in Jobs) to open their profile: contact details, Lead or Customer, opt-outs and consent, totals (spent, owing, jobs, lifetime value, open inquiries; money is hidden from staff logins), current inquiries, jobs with links to the customer's project page, invoices with pay links, upcoming visits and crew, editable details and team-only notes, and one **conversation history**: every text, email, chatbot conversation, call (with voicemail), automatic workflow message, inquiry, job and payment, newest first.
+
 ## Staff and crew scheduling
 
 **Staff** tab (each business): the crew directory, a weekly crew scheduler, and calendar invites.

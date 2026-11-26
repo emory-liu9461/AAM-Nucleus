@@ -72,7 +72,7 @@ export default async function LeadDetail({ params }: { params: Promise<{ slug: s
 
       <div className="grid gap-4 lg:grid-cols-3">
         <section className="card space-y-2 text-sm">
-          <div className="card-title">Contact</div>
+          <div className="flex items-center justify-between"><div className="card-title mb-0">Contact</div><Link className="text-xs text-accent hover:underline" href={`/b/${b.slug}/contacts/${c.id}`}>Full profile →</Link></div>
           {c.phone && <div className="flex gap-2"><a className="btn" href={`tel:${phoneDigits}`}>Call {c.phone}</a><a className="btn-ghost" href={`sms:${phoneDigits}`}>Text</a></div>}
           {c.email && <div><a className="text-accent hover:underline" href={`mailto:${c.email}`}>{c.email}</a></div>}
           {(c.address || c.city || c.zip) && <div className="text-muted">{[c.address, c.city, c.zip].filter(Boolean).join(", ")}</div>}

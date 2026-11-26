@@ -150,6 +150,33 @@ export async function setLeadStage(slug: string, leadId: string, form: FormData)
   revalidatePath("/");
 }
 
+/* ---------- contact profile ---------- */
+
+export async function saveContact(slug: string, contactId: string, _: { error?: string; ok?: string } | null, form: FormData) {
+  const { business: b } = await requireBusiness(slug);
+  const firstName = str(form, "firstName");
+  if (!firstName) return { error: "Enter a first name." };
+  const email = str(form, "email")?.toLowerCase() ?? null;
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "That email address doesn't look right." };
+  const [row] = await db
+    .update(contacts)
+    .set({
+      firstName: firstName.slice(0, 100),
+      lastName: (str(form, "lastName") ?? "").slice(0, 100),
+      phone: str(form, "phone")?.slice(0, 40) ?? null,
+      email,
+      address: str(form, "address")?.slice(0, 200) ?? null,
+      city: str(form, "city")?.slice(0, 100) ?? null,
+      zip: str(form, "zip")?.slice(0, 20) ?? null,
+      notes: str(form, "notes")?.slice(0, 5000) ?? null,
+    })
+    .where(and(eq(contacts.id, contactId), eq(contacts.businessId, b.id)))
+    .returning({ id: contacts.id });
+  if (!row) return { error: "Not found." };
+  revalidatePath(`/b/${slug}`, "layout");
+  return { ok: "Saved." };
+}
+
 /* ---------- jobs ---------- */
 
 export async function updateJob(slug: string, jobId: string, form: FormData) {
