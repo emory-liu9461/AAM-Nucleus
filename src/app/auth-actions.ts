@@ -96,7 +96,7 @@ export async function setupOwner(_: FormState, form: FormData): Promise<FormStat
   if (!emailOk(email)) return { error: "Enter a valid email" };
   if (password.length < MIN_PASSWORD) return { error: `Password must be at least ${MIN_PASSWORD} characters` };
   if (password !== String(form.get("confirm") ?? "").trim()) return { error: "Passwords don't match" };
-  const [u] = await db.insert(users).values({ name, email, passwordHash: await hashPassword(password), role: "owner" }).returning();
+  const [u] = await db.insert(users).values({ name, email, passwordHash: await hashPassword(password), role: "owner", canSendQuotes: true }).returning();
   await startSession(u.id, u.sessionVersion);
   redirect("/");
 }
@@ -159,7 +159,7 @@ export async function createUser(_: FormState, form: FormData): Promise<FormStat
   if (password.length < MIN_PASSWORD) return { error: `Temporary password must be at least ${MIN_PASSWORD} characters` };
   if (role !== "owner" && access.length === 0) return { error: "Give them access to at least one business" };
   if (await findByEmail(email)) return { error: "Someone with that email already has an account" };
-  const [u] = await db.insert(users).values({ name, email, role, passwordHash: await hashPassword(password) }).returning();
+  const [u] = await db.insert(users).values({ name, email, role, passwordHash: await hashPassword(password), canSendQuotes: role !== "staff" && form.get("canSendQuotes") === "on" }).returning();
   if (role !== "owner") await setAccess(u.id, access);
   revalidatePath("/team");
   return { ok: `${name} added. Share their email and temporary password with them.` };
@@ -177,7 +177,13 @@ export async function updateUser(userId: string, _: FormState, form: FormData): 
   if (target.role === "owner" && role !== "owner" && (await activeOwnerCount(target.id)) === 0)
     return { error: "There must always be at least one active owner" };
   if (role !== "owner" && access.length === 0) return { error: "Give them access to at least one business" };
-  await db.update(users).set({ role, name }).where(eq(users.id, userId));
+  // Sending quotes: only owners and managers can be given it (staff never see quotes).
+  const canSendQuotes = role !== "staff" && form.get("canSendQuotes") === "on";
+  if (target.canSendQuotes && !canSendQuotes) {
+    const [{ n }] = await db.select({ n: sql<number>`count(*)` }).from(users).where(and(eq(users.canSendQuotes, true), eq(users.active, true), sql`${users.id} <> ${target.id}`));
+    if (Number(n) === 0) return { error: "Someone has to be able to send quotes. Give another person permission first." };
+  }
+  await db.update(users).set({ role, name, canSendQuotes }).where(eq(users.id, userId));
   await setAccess(userId, role === "owner" ? [] : access);
   revalidatePath("/", "layout");
   return { ok: "Saved" };

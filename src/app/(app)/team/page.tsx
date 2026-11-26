@@ -45,6 +45,7 @@ export default async function TeamPage() {
           <label className="field">Name<input className="input" name="name" required /></label>
           <label className="field">Email (their login)<input className="input" type="email" name="email" required /></label>
           <RoleSelect defaultValue="staff" />
+          <label className="flex items-start gap-2 text-sm sm:col-span-2"><input type="checkbox" name="canSendQuotes" defaultChecked={false} className="mt-1" /> <span>Can send quotes to customers<span className="block text-xs text-muted">Owners and managers only. Everyone else can build quotes, but can&apos;t send them (or see the customer link).</span></span></label>
           <label className="field">Temporary password<input className="input" name="password" minLength={8} required autoComplete="new-password" placeholder="At least 8 characters" /></label>
           <BusinessChecks businesses={biz} checked={biz.length === 1 ? [biz[0].id] : []} />
         </ActionForm>
@@ -63,6 +64,7 @@ export default async function TeamPage() {
                   <span className="ml-2 text-xs text-muted">{p.email}</span>
                 </span>
                 <span className="pill bg-accent/15 text-accent">{label(p.role)}</span>
+                {p.canSendQuotes && <span className="pill bg-green-500/15 text-green-700 dark:text-green-300" title="Can send quotes to customers">Sends quotes</span>}
                 <span className="flex gap-1">
                   {p.role === "owner" ? (
                     <span className="text-xs text-muted">All businesses</span>
@@ -83,6 +85,7 @@ export default async function TeamPage() {
                   <label className="field">Name<input className="input" name="name" defaultValue={p.name} required /></label>
                   <RoleSelect defaultValue={p.role} />
                   <BusinessChecks businesses={biz} checked={mine} />
+                  <label className="flex items-start gap-2 text-sm sm:col-span-2"><input type="checkbox" name="canSendQuotes" defaultChecked={p.canSendQuotes} className="mt-1" /> <span>Can send quotes to customers<span className="block text-xs text-muted">Owners and managers only. Everyone else can build quotes, but can&apos;t send them (or see the customer link).</span></span></label>
                 </ActionForm>
 
                 <ActionForm action={resetUserPassword.bind(null, p.id)} submit="Set new password" className="grid gap-3 sm:grid-cols-2">

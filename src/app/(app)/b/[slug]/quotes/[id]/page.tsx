@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { approveQuote, deleteQuote, markQuoteSent, reopenQuote, saveQuote, sendQuote } from "@/app/quote-actions";
 import { ActionForm } from "@/components/ActionForm";
@@ -20,7 +20,12 @@ const { quotes, contacts, users } = schema;
 export default async function QuotePage({ params, searchParams }: { params: Promise<{ slug: string; id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const [{ slug, id }, { tab }] = await Promise.all([params, searchParams]);
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const { business: b } = await requireBusinessPage(slug, "view_financials");
+  const { business: b, user } = await requireBusinessPage(slug, "view_financials");
+  // Who's allowed to send quotes for this business (Team → Can send quotes).
+  const senders = await db
+    .select({ name: users.name })
+    .from(users)
+    .where(and(eq(users.canSendQuotes, true), eq(users.active, true), sql`(${users.role} = 'owner' or exists (select 1 from user_businesses ub where ub.user_id = ${users.id} and ub.business_id = ${b.id}))`));
   const [row] = await db.select({ q: quotes, c: contacts, approver: users.name }).from(quotes).innerJoin(contacts, eq(contacts.id, quotes.contactId)).leftJoin(users, eq(users.id, quotes.approvedById)).where(and(eq(quotes.id, id), eq(quotes.businessId, b.id)));
   if (!row) notFound();
   const { q, c } = row;
@@ -69,13 +74,22 @@ export default async function QuotePage({ params, searchParams }: { params: Prom
         )}
         {(q.status === "approved" || q.status === "sent") && (
           <div className="space-y-3">
-            <ActionForm action={sendQuote.bind(null, b.slug, q.id)} submit={q.status === "sent" ? "Send again" : "Send to customer"} pendingText="Sending…" className="flex flex-wrap items-center gap-4">
-              <label className="flex items-center gap-1.5 text-sm"><input type="checkbox" name="sms" defaultChecked={Boolean(c.phone)} /> Text {c.phone ?? ""}</label>
-              <label className="flex items-center gap-1.5 text-sm"><input type="checkbox" name="email" defaultChecked={Boolean(c.email)} /> Email {c.email ?? ""}</label>
-            </ActionForm>
-            <div className="max-w-xl"><CopyField value={link} /></div>
+            {user.canSendQuotes ? (
+              <>
+                <ActionForm action={sendQuote.bind(null, b.slug, q.id)} submit={q.status === "sent" ? "Send again" : "Send to customer"} pendingText="Sending…" className="flex flex-wrap items-center gap-4"
+                  confirm={`${q.status === "sent" ? "Send again" : "Send"} quote ${q.number} for ${moneyExact(q.total)} to ${name || "the customer"}?`}>
+                  <label className="flex items-center gap-1.5 text-sm"><input type="checkbox" name="sms" defaultChecked={Boolean(c.phone)} /> Text {c.phone ?? ""}</label>
+                  <label className="flex items-center gap-1.5 text-sm"><input type="checkbox" name="email" defaultChecked={Boolean(c.email)} /> Email {c.email ?? ""}</label>
+                </ActionForm>
+                <div className="max-w-xl"><CopyField value={link} /></div>
+              </>
+            ) : (
+              <p className="rounded-lg bg-bg p-3 text-sm">
+                {q.status === "sent" ? "Sent to the customer." : "Approved and ready to go."} Only {senders.length ? senders.map((x) => x.name).join(", ") : "people with permission"} can send quotes to customers (Team → Can send quotes).
+              </p>
+            )}
             <div className="flex flex-wrap gap-3 text-xs">
-              {q.status === "approved" && <form action={markQuoteSent.bind(null, b.slug, q.id)}><button className="text-accent hover:underline">I sent the link myself: mark as sent</button></form>}
+              {q.status === "approved" && user.canSendQuotes && <form action={markQuoteSent.bind(null, b.slug, q.id)}><button className="text-accent hover:underline">I sent the link myself: mark as sent</button></form>}
               {q.status === "approved" && <form action={reopenQuote.bind(null, b.slug, q.id)}><button className="text-muted hover:text-ink">Make changes (back to draft)</button></form>}
             </div>
           </div>

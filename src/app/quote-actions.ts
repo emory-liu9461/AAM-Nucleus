@@ -92,6 +92,7 @@ export async function reopenQuote(slug: string, quoteId: string) {
 /** Text and/or email the customer their quote link. Only approved quotes go out. */
 export async function sendQuote(slug: string, quoteId: string, _: FormState, form: FormData): Promise<FormState> {
   const { business: b, user } = await requireBusiness(slug, "view_financials");
+  if (!user.canSendQuotes) return { error: "You don't have permission to send quotes. Ask an owner (Team → Can send quotes)." };
   const [row] = await db.select({ q: quotes, c: contacts }).from(quotes).innerJoin(contacts, eq(contacts.id, quotes.contactId)).where(and(eq(quotes.id, quoteId), eq(quotes.businessId, b.id)));
   if (!row) return { error: "Quote not found." };
   const { q, c } = row;
@@ -122,7 +123,8 @@ export async function sendQuote(slug: string, quoteId: string, _: FormState, for
 
 /** You sent the link yourself (copied it into your own email or text). */
 export async function markQuoteSent(slug: string, quoteId: string) {
-  const { business: b } = await requireBusiness(slug, "view_financials");
+  const { business: b, user } = await requireBusiness(slug, "view_financials");
+  if (!user.canSendQuotes) throw new Error("You don't have permission to send quotes");
   const [q] = await db.select().from(quotes).where(and(eq(quotes.id, quoteId), eq(quotes.businessId, b.id)));
   if (q && q.status === "approved") await markSentNow(b.id, q.id, q.leadId);
   refresh(slug);
@@ -146,7 +148,7 @@ export async function deleteQuote(slug: string, quoteId: string) {
 async function byToken(token: string) {
   if (!/^[a-f0-9]{32}$/.test(token)) return null;
   const [row] = await db.select({ q: quotes, b: businesses }).from(quotes).innerJoin(businesses, eq(businesses.id, quotes.businessId)).where(eq(quotes.token, token));
-  return row && (row.q.status === "sent" || row.q.status === "approved") ? row : null;
+  return row && row.q.status === "sent" ? row : null; // only quotes that were actually sent
 }
 
 export async function customerAcceptQuote(token: string) {

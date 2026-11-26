@@ -97,6 +97,8 @@ export const users = pgTable(
     passwordHash: text("password_hash").notNull(),
     role: userRole("role").notNull().default("staff"),
     active: boolean("active").notNull().default(true),
+    // Only people with this can send quotes to customers (owners get it by default).
+    canSendQuotes: boolean("can_send_quotes").notNull().default(false),
     sessionVersion: integer("session_version").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true }),

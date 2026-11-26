@@ -28,18 +28,19 @@ export default async function CustomerQuote({ params, searchParams }: { params: 
   // Drafts are only visible to the team, as a preview.
   const session = sp.preview ? await getSession() : null;
   const teamPreview = Boolean(session?.businesses.some((x) => x.id === b.id));
-  if (q.status === "draft" && !teamPreview) notFound();
+  // Until it's sent (by someone allowed to), only the team can see it, as a preview.
+  if ((q.status === "draft" || q.status === "approved") && !teamPreview) notFound();
   if (!teamPreview && !q.viewedAt && (q.status === "sent" || q.status === "approved")) await db.update(schema.quotes).set({ viewedAt: new Date() }).where(eq(schema.quotes.id, q.id));
 
   const today = new Date().toISOString().slice(0, 10);
   const expired = Boolean(q.validUntil && q.validUntil < today && (q.status === "sent" || q.status === "approved"));
-  const open = (q.status === "sent" || q.status === "approved") && !expired;
+  const open = q.status === "sent" && !expired;
   const s = quoteSettings(b);
   const logo = logoUrl(b);
 
   return (
     <div className="min-h-screen bg-surface">
-      {teamPreview && <div className="bg-accent px-4 py-2 text-center text-sm font-medium text-white">Preview: this is what the customer sees{q.status === "draft" ? " once the quote is approved and sent" : ""}. Costs and margins are never shown.</div>}
+      {teamPreview && <div className="bg-accent px-4 py-2 text-center text-sm font-medium text-white">Preview: this is what the customer sees{q.status === "draft" || q.status === "approved" ? " once the quote is sent" : ""}. Costs and margins are never shown.</div>}
       <header className="border-b border-line bg-white">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-3">
           <span className="font-semibold">{b.name}</span>
