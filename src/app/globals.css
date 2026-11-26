@@ -54,3 +54,6 @@ body {
   .tbl tr:last-child td { @apply border-b-0; }
   .pill { @apply inline-block rounded-full px-2 py-0.5 text-xs font-medium; }
 }
+
+/* Printed quotes and other documents: comfortable page margins. */
+@page { margin: 16mm; }

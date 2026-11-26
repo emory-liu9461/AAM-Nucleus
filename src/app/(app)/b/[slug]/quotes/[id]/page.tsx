@@ -8,6 +8,8 @@ import { ActionForm } from "@/components/ActionForm";
 import { Badge } from "@/components/Badge";
 import { CopyField } from "@/components/CopyField";
 import { QuoteBuilder } from "@/components/QuoteBuilder";
+import { QuoteDocument } from "@/components/QuoteDocument";
+import { logoUrl } from "@/lib/site-defaults";
 import { fmtDate, fmtDateTime, moneyExact } from "@/lib/format";
 import { requireBusinessPage } from "@/lib/session";
 import { quoteSettings } from "@/lib/quotes";
@@ -15,8 +17,8 @@ import { appBase } from "@/lib/twilio";
 
 const { quotes, contacts, users } = schema;
 
-export default async function QuotePage({ params }: { params: Promise<{ slug: string; id: string }> }) {
-  const { slug, id } = await params;
+export default async function QuotePage({ params, searchParams }: { params: Promise<{ slug: string; id: string }>; searchParams: Promise<{ tab?: string }> }) {
+  const [{ slug, id }, { tab }] = await Promise.all([params, searchParams]);
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const { business: b } = await requireBusinessPage(slug, "view_financials");
   const [row] = await db.select({ q: quotes, c: contacts, approver: users.name }).from(quotes).innerJoin(contacts, eq(contacts.id, quotes.contactId)).leftJoin(users, eq(users.id, quotes.approvedById)).where(and(eq(quotes.id, id), eq(quotes.businessId, b.id)));
@@ -40,8 +42,14 @@ export default async function QuotePage({ params }: { params: Promise<{ slug: st
             {q.acceptedAt ? ` · accepted ${fmtDateTime(q.acceptedAt)}` : ""}{q.declinedAt ? ` · declined ${fmtDateTime(q.declinedAt)}` : ""}
           </p>
         </div>
-        <a className="btn-ghost" href={`/q/${q.token}?preview=1`} target="_blank" rel="noreferrer">Preview what the customer sees ↗</a>
+        <a className="btn-ghost" href={`/q/${q.token}?preview=1`} target="_blank" rel="noreferrer">Customer&apos;s quote page ↗</a>
       </div>
+
+      <nav className="flex gap-1 text-sm">
+        {[["", "Edit"], ["internal", "Internal version (our costs)"], ["external", "External version (for the customer)"]].map(([k, l]) => (
+          <Link key={k} href={k ? `?tab=${k}` : "?"} className={`rounded-lg px-3 py-1.5 ${(tab ?? "") === k ? "border border-line bg-panel font-semibold" : "text-muted hover:text-ink"}`}>{l}</Link>
+        ))}
+      </nav>
 
       {/* Review → approve → send */}
       <section className="card space-y-3">
@@ -75,6 +83,15 @@ export default async function QuotePage({ params }: { params: Promise<{ slug: st
         {q.status === "accepted" && <p className="text-sm text-good">Accepted. The lead is Won and the job was created{q.jobId ? <> (<Link className="underline" href={`/b/${b.slug}/jobs`}>Jobs</Link>)</> : ""}.</p>}
       </section>
 
+      {tab === "internal" || tab === "external" ? (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <a className="btn" href={`/print/quote/${q.id}?v=${tab}`} target="_blank" rel="noreferrer">Print / save as PDF</a>
+            <span className="text-sm text-muted">{tab === "internal" ? "Your costs, expenses and margin. Keep this one in-house." : "The scope of work and price the customer gets (same as their quote page)."}</span>
+          </div>
+          <QuoteDocument q={q} b={b} c={c} variant={tab} logo={logoUrl(b)} terms={s.terms} />
+        </div>
+      ) : (
       <QuoteBuilder
         action={saveQuote.bind(null, b.slug, q.id)}
         editable={editable}
@@ -87,8 +104,9 @@ export default async function QuotePage({ params }: { params: Promise<{ slug: st
         taxRate={Number(b.taxRate ?? 0)}
         taxLabel={b.taxLabel || "Tax"}
       />
+      )}
 
-      {editable && (
+      {editable && !tab && (
         <form action={deleteQuote.bind(null, b.slug, q.id)}>
           <button className="text-xs text-muted hover:text-bad">Delete this quote</button>
         </form>

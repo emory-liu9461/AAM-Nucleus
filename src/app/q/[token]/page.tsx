@@ -7,6 +7,7 @@ import { getSession } from "@/lib/session";
 import { logoUrl } from "@/lib/site-defaults";
 import { quoteSettings } from "@/lib/quotes";
 import { fmtDate, moneyExact } from "@/lib/format";
+import { QuoteDocument } from "@/components/QuoteDocument";
 
 /* The customer's quote (/q/<token>): what's included, the price with tax, and Accept / Decline. */
 
@@ -35,15 +36,13 @@ export default async function CustomerQuote({ params, searchParams }: { params: 
   const open = (q.status === "sent" || q.status === "approved") && !expired;
   const s = quoteSettings(b);
   const logo = logoUrl(b);
-  const materials = q.items.materials.filter((m) => m.name);
 
   return (
     <div className="min-h-screen bg-surface">
       {teamPreview && <div className="bg-accent px-4 py-2 text-center text-sm font-medium text-white">Preview: this is what the customer sees{q.status === "draft" ? " once the quote is approved and sent" : ""}. Costs and margins are never shown.</div>}
       <header className="border-b border-line bg-white">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {logo ? <img src={logo} alt={b.name} className="h-10 w-auto max-w-[60%] object-contain object-left" /> : <span className="text-lg font-bold">{b.name}</span>}
+          <span className="font-semibold">{b.name}</span>
           {b.phone && <a href={`tel:${b.phone.replace(/[^\d+]/g, "")}`} className="text-sm font-medium text-muted hover:text-ink">{b.phone}</a>}
         </div>
       </header>
@@ -52,34 +51,7 @@ export default async function CustomerQuote({ params, searchParams }: { params: 
         {q.status === "declined" && <div className="card text-sm">This quote was declined. Questions? Contact {b.name}{b.phone ? ` at ${b.phone}` : ""}.</div>}
         {(expired || sp.expired) && q.status !== "accepted" && <div className="card border-bad/40 bg-bad/10 text-sm">This quote expired on {fmtDate(q.validUntil!)}. Contact {b.name} for an updated price.</div>}
 
-        <section className="card space-y-4">
-          <div>
-            <p className="text-sm text-muted">Quote {q.number}{c.firstName ? ` for ${c.firstName} ${c.lastName}`.trimEnd() : ""}</p>
-            <h1 className="text-2xl font-bold">{q.title}</h1>
-            <p className="text-xs text-muted">{fmtDate(q.createdAt)}{q.validUntil ? ` · valid until ${fmtDate(q.validUntil)}` : ""}</p>
-          </div>
-          {q.scope && (
-            <div>
-              <h2 className="text-sm font-semibold">What&apos;s included</h2>
-              <p className="mt-1 whitespace-pre-line text-sm">{q.scope}</p>
-            </div>
-          )}
-          {materials.length > 0 && (
-            <div>
-              <h2 className="text-sm font-semibold">Materials</h2>
-              <ul className="mt-1 list-disc pl-5 text-sm text-muted">
-                {materials.map((m, i) => <li key={i}>{m.name}{m.qty ? ` (${m.qty}${m.unit ? ` ${m.unit}${m.qty === 1 ? "" : "s"}` : ""})` : ""}</li>)}
-              </ul>
-            </div>
-          )}
-          <dl className="divide-y divide-line text-sm">
-            {q.discount > 0 && <Line k="Price" v={moneyExact(q.listPrice)} />}
-            {q.discount > 0 && <Line k={`Discount${q.discountType === "percent" ? ` (${Number(q.discountValue)}%)` : ""}`} v={`− ${moneyExact(q.discount)}`} good />}
-            <Line k={q.taxAmount ? "Subtotal" : "Total"} v={moneyExact(q.price)} strong={!q.taxAmount} />
-            {q.taxAmount > 0 && <Line k={q.taxLabel ?? "Tax"} v={moneyExact(q.taxAmount)} />}
-            {q.taxAmount > 0 && <Line k="Total incl. tax" v={moneyExact(q.total)} strong />}
-          </dl>
-        </section>
+        <QuoteDocument q={q} b={b} c={c} variant="external" logo={logo} terms={s.terms} />
 
         {open && !teamPreview && (
           <section className="card space-y-3">
@@ -97,18 +69,8 @@ export default async function CustomerQuote({ params, searchParams }: { params: 
           </section>
         )}
 
-        {s.terms && <p className="whitespace-pre-line text-xs text-muted">{s.terms}</p>}
         <p className="text-center text-xs text-muted">Questions? Contact {b.name}{b.phone ? ` at ${b.phone}` : ""}{b.email ? ` or ${b.email}` : ""}.</p>
       </main>
-    </div>
-  );
-}
-
-function Line({ k, v, strong, good }: { k: string; v: string; strong?: boolean; good?: boolean }) {
-  return (
-    <div className={`flex justify-between gap-3 py-2 ${strong ? "text-base font-bold" : ""}`}>
-      <dt className={strong ? "" : "text-muted"}>{k}</dt>
-      <dd className={good ? "text-good" : ""}>{v}</dd>
     </div>
   );
 }
