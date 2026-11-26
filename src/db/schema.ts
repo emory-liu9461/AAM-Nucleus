@@ -141,6 +141,8 @@ export const businesses = pgTable("businesses", {
   reviewSettings: jsonb("review_settings").$type<ReviewSettings>(),
   // Customer workflow: automatic messages through a job, and the prep guide.
   workflowSettings: jsonb("workflow_settings").$type<WorkflowSettings>(),
+  // Quote defaults: worker cost per hour, profit margin, materials price list, terms.
+  quoteSettings: jsonb("quote_settings").$type<QuoteSettings>(),
   // Online payments: Stripe keys (encrypted) and e-Transfer instructions.
   paymentSettings: jsonb("payment_settings").$type<PaymentSettings>(),
   // Sales tax added to invoices (e.g. "HST", "13").
@@ -497,6 +499,73 @@ export const calls = pgTable(
   },
   (t) => [index("calls_business_idx").on(t.businessId, t.createdAt)],
 );
+
+/*
+ * Quotes: priced from labour and materials plus a profit margin, reviewed and approved by an
+ * owner or manager, then shown to the customer (/q/<token>), who can accept it online.
+ */
+export const quoteStatus = pgEnum("quote_status", ["draft", "approved", "sent", "accepted", "declined"]);
+
+export const quotes = pgTable(
+  "quotes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id").references(() => leads.id, { onDelete: "set null" }),
+    contactId: uuid("contact_id")
+      .notNull()
+      .references(() => contacts.id, { onDelete: "cascade" }),
+    number: text("number").notNull(),
+    status: quoteStatus("status").notNull().default("draft"),
+    title: text("title").notNull(),
+    scope: text("scope"), // what's included, shown to the customer
+    items: jsonb("items").$type<QuoteItems>().notNull(),
+    marginType: text("margin_type").$type<"percent" | "amount">().notNull().default("percent"),
+    marginValue: text("margin_value").notNull().default("30"), // % of the price, or dollars
+    cost: integer("cost").notNull().default(0), // cents: labour + materials + other
+    listPrice: integer("list_price").notNull().default(0), // cents: cost + profit, before any discount
+    discountType: text("discount_type").$type<"percent" | "amount">().notNull().default("percent"),
+    discountValue: text("discount_value").notNull().default("0"),
+    discount: integer("discount").notNull().default(0), // cents taken off the list price
+    price: integer("price").notNull().default(0), // cents, after the discount, before tax
+    includeTax: boolean("include_tax").notNull().default(true),
+    taxLabel: text("tax_label"),
+    taxAmount: integer("tax_amount").notNull().default(0),
+    total: integer("total").notNull().default(0),
+    validUntil: date("valid_until"),
+    token: text("token")
+      .notNull()
+      .unique()
+      .default(sql`replace(gen_random_uuid()::text, '-', '')`),
+    approvedById: uuid("approved_by_id").references(() => users.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    viewedAt: timestamp("viewed_at", { withTimezone: true }),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    declinedAt: timestamp("declined_at", { withTimezone: true }),
+    jobId: uuid("job_id").references(() => jobs.id, { onDelete: "set null" }),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("quotes_business_idx").on(t.businessId, t.createdAt), index("quotes_lead_idx").on(t.leadId)],
+);
+
+export type QuoteItems = {
+  labour: { description: string; workers: number; hours: number; rate: number }[]; // rate = cost per worker-hour, dollars
+  materials: { name: string; unit: string; qty: number; unitCost: number }[]; // dollars
+  other: { description: string; amount: number }[]; // dollars
+};
+export type QuoteSettings = {
+  hourlyCost?: number; // default cost per worker-hour, dollars
+  marginPercent?: number; // default profit margin, % of the price
+  materials?: { name: string; unit: string; unitCost: number }[];
+  validDays?: number;
+  terms?: string;
+};
+export type Quote = typeof quotes.$inferSelect;
 
 /** "Mark as replied" / "Mark as not replied" for an item, shared by the whole team (a conversation, call or lead id). */
 export const messageHandled = pgTable("message_handled", {

@@ -108,6 +108,12 @@ Click a name in Contacts (or **Profile** in Messages, **Full profile** on a lead
 - **Jobs and the schedule are linked:** each job on the Jobs tab shows its scheduled visits and crew (with roles and invite status) and has its own **Assign work** form with the job already picked. A job's start and end dates follow its schedule, and a Scheduled job becomes In progress once its first scheduled work starts (checked when you open the business, and by the daily job).
 - Times use the business time zone (Settings for the AI assistant's booking hours). Calendar replies ("Accepted: …") from crew are kept out of the Inbox.
 
+## Quotes
+
+On a lead (owners and managers), **+ New quote** opens the quote builder: **labour** (work, workers, hours each, cost per worker-hour), **materials** (item, units needed, unit, cost per unit; the materials price list in **Settings → Quotes** fills in the unit and cost as you type) and **other costs**. **Profit** is a % margin (share of the price) or a $ amount; an optional **discount** (% or $) comes off the price; the **Tax: on/off** button adds the business's sales tax. Totals (cost, profit with margin and markup, price, discount, tax, total incl. tax) update live and are recomputed on the server.
+
+Flow: **Draft → Approved** (an owner or manager approves; editing an approved quote sends it back for approval) **→ Sent** (text/email the customer the link, or copy it and mark it sent; the lead moves to Estimate sent) **→ Accepted/Declined**. The customer's page (`/q/<token>`) shows what's included, materials, discount, tax and the total, never costs or margins, with **Accept** (the lead is Won and the job is created with the quote's price and cost) or **Decline** (with an optional reason). The team is alerted either way. The lead shows its quotes, the customer profile highlights the latest one, and the Leads tab shows **potential revenue, estimated cost and potential profit** for open leads (from their latest quote, else the lead's estimated value) and quotes waiting to be approved or out with customers.
+
 ## Online payments
 
 Every invoice has a private payment page (`/pay/<token>`): the invoice with tax, what's been paid, a **Pay by card** button (Stripe Checkout) and Interac e-Transfer instructions. On the Invoices tab, **Copy link** or **Send** (text and email) gives it to the customer; the customer's project page lists the job's invoices with Pay buttons.

@@ -54,6 +54,7 @@ export default async function ContactProfile({ params }: { params: Promise<{ slu
     invIds.length ? db.select().from(payments).where(inArray(payments.invoiceId, invIds)).orderBy(desc(payments.receivedAt)) : Promise.resolve([]),
   ]);
   const crews = await crewFor(events.map((e) => e.id));
+  const contactQuotes = money ? await db.select().from(schema.quotes).where(eq(schema.quotes.contactId, c.id)).orderBy(desc(schema.quotes.createdAt)) : [];
   const now = new Date();
 
   const isCustomer = jobRows.length > 0 || leadRows.some((l) => l.stage === "won");
@@ -137,6 +138,42 @@ export default async function ContactProfile({ params }: { params: Promise<{ slu
               </ul>
             )}
           </Section>
+
+          {money && contactQuotes.length > 0 && (
+            <Section title="Quotes">
+              {(() => {
+                const q = contactQuotes[0];
+                return (
+                  <Link href={`/b/${b.slug}/quotes/${q.id}`} className="block rounded-lg border border-accent/40 bg-accent/5 p-3 hover:border-accent">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-semibold">{q.title}</span>
+                      <Badge value={q.status} />
+                    </div>
+                    <div className="mt-1 text-2xl font-bold">{moneyExact(q.total)}<span className="ml-1 text-xs font-normal text-muted">{q.taxAmount ? `incl. ${q.taxLabel}` : "no tax"}</span></div>
+                    <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted">
+                      <span>{q.number}</span>
+                      <span>Cost {moneyExact(q.cost)}</span>
+                      <span className={q.price - q.cost < 0 ? "text-bad" : "text-good"}>Profit {moneyExact(q.price - q.cost)}</span>
+                      {q.discount > 0 && <span>Discount {moneyExact(q.discount)}</span>}
+                      {q.sentAt && <span>Sent {fmtDate(q.sentAt)}</span>}
+                      {q.viewedAt && <span>Opened {fmtDate(q.viewedAt)}</span>}
+                      {q.acceptedAt && <span className="text-good">Accepted {fmtDate(q.acceptedAt)}</span>}
+                    </div>
+                  </Link>
+                );
+              })()}
+              {contactQuotes.length > 1 && (
+                <ul className="mt-2 divide-y divide-line text-sm">
+                  {contactQuotes.slice(1).map((q) => (
+                    <li key={q.id} className="flex items-center justify-between gap-2 py-1.5">
+                      <Link className="hover:underline" href={`/b/${b.slug}/quotes/${q.id}`}>{q.number} · {q.title}</Link>
+                      <span className="flex items-center gap-2 text-xs">{moneyExact(q.total)} <Badge value={q.status} /></span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Section>
+          )}
 
           <Section title="Jobs">
             {jobRows.length === 0 ? <Empty>No jobs yet.</Empty> : (

@@ -20,6 +20,9 @@ const TONES: Record<string, string> = {
   follow_up: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
   other: "bg-gray-500/15 text-gray-600 dark:text-gray-400",
   overdue: "bg-red-500/15 text-red-700 dark:text-red-300",
+  approved: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
+  accepted: "bg-green-500/15 text-green-700 dark:text-green-300",
+  declined: "bg-red-500/15 text-red-700 dark:text-red-300",
 };
 
 export function Badge({ value }: { value: string }) {

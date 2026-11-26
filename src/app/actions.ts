@@ -23,7 +23,8 @@ import { saveStats } from "@/lib/social-sync/store";
 import { isValidTimezone } from "@/lib/availability";
 import { cancelCrewInvites } from "@/lib/staff";
 import { syncJobDates } from "@/lib/jobs";
-import { sendCompleted, sendVisitCancelled, sendWelcome, workflowSettings } from "@/lib/workflow";
+import { sendCompleted, sendVisitCancelled, workflowSettings } from "@/lib/workflow";
+import { winLead } from "@/lib/quotes";
 
 // Every action checks the signed-in user's access first. requireBusiness() 404s
 // if the user isn't assigned to that business; the optional permission argument
@@ -125,28 +126,9 @@ export async function createLead(slug: string, form: FormData) {
 export async function setLeadStage(slug: string, leadId: string, form: FormData) {
   const { business: b, user } = await requireBusiness(slug);
   const stage = req(form, "stage") as (typeof schema.leadStage.enumValues)[number];
-  const [lead] = await db
-    .update(leads)
-    .set({ stage, closedAt: stage === "won" || stage === "lost" ? new Date() : null })
-    .where(and(eq(leads.id, leadId), eq(leads.businessId, b.id)))
-    .returning();
-  // Winning a lead creates its job automatically (once).
-  if (lead && stage === "won") {
-    const [existing] = await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.leadId, lead.id));
-    if (!existing) {
-      const [c] = await db.select().from(contacts).where(eq(contacts.id, lead.contactId));
-      const [job] = await db.insert(jobs).values({
-        businessId: b.id,
-        contactId: lead.contactId,
-        leadId: lead.id,
-        name: `${lead.title} – ${c?.lastName || c?.firstName || "Customer"}`,
-        contractValue: lead.estimatedValue,
-        address: [c?.address, c?.city].filter(Boolean).join(", ") || null,
-      }).returning({ id: jobs.id });
-      // Customer workflow: welcome message with their project page (if on).
-      await sendWelcome(b, job.id, { userId: user.id }).catch((e) => console.error("welcome message:", e));
-    }
-  }
+  // Winning a lead creates its job automatically (once), with the customer-workflow welcome.
+  if (stage === "won") await winLead(b, leadId, { userId: user.id });
+  else await db.update(leads).set({ stage, closedAt: stage === "lost" ? new Date() : null }).where(and(eq(leads.id, leadId), eq(leads.businessId, b.id)));
   revalidatePath(`/b/${slug}`, "layout");
   revalidatePath("/");
 }

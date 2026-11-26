@@ -9,6 +9,8 @@ import { headers } from "next/headers";
 import { disconnectStripe, savePaymentSettings } from "@/app/payment-actions";
 import { CopyField } from "@/components/CopyField";
 import { stripeKey, stripeWebhookSecret } from "@/lib/stripe";
+import { saveQuoteSettings } from "@/app/quote-actions";
+import { quoteSettings } from "@/lib/quotes";
 
 // Common sales tax on contractor services by province (combined rate). Confirm with your accountant.
 const TAX_PRESETS: [string, string][] = [
@@ -33,6 +35,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ slug:
   const ps = b.paymentSettings ?? {};
   const key = stripeKey(b);
   const hookUrl = `${appBase(await headers())}/api/stripe/webhook/${b.id}`;
+  const qs = quoteSettings(b);
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -86,6 +89,23 @@ export default async function SettingsPage({ params }: { params: Promise<{ slug:
             <textarea className="input" name="message" rows={3} maxLength={400} defaultValue={b.reviewSettings?.message ?? ""} placeholder={DEFAULT_REVIEW_MESSAGE} />
             <span className="font-normal">Texts end with &ldquo;Reply STOP to opt out.&rdquo; Customers who opted out aren&apos;t texted.</span>
           </label>
+        </ActionForm>
+      </section>
+
+      <section className="card space-y-3" id="quotes">
+        <div>
+          <div className="card-title mb-1">Quotes</div>
+          <p className="text-sm text-muted">Defaults for new quotes (on each lead). An owner or manager approves every quote before it goes to the customer.</p>
+        </div>
+        <ActionForm action={saveQuoteSettings.bind(null, b.slug)} submit="Save quote defaults" className="grid gap-3 sm:grid-cols-3">
+          <label className="field">Worker cost per hour ($)<input className="input" name="hourlyCost" type="number" min={0} step={0.5} defaultValue={qs.hourlyCost} /><span className="font-normal">What an hour of a worker costs you (wage + burden).</span></label>
+          <label className="field">Default profit margin (%)<input className="input" name="marginPercent" type="number" min={0} max={90} step={1} defaultValue={qs.marginPercent} /><span className="font-normal">Share of the price that&apos;s profit.</span></label>
+          <label className="field">Quotes valid for (days)<input className="input" name="validDays" type="number" min={1} max={365} defaultValue={qs.validDays} /></label>
+          <label className="field sm:col-span-3">Materials price list: one per line, <span className="font-mono">Item | unit | cost per unit</span>
+            <textarea className="input font-normal" name="materials" rows={Math.max(6, (qs.materials?.length ?? 0) + 1)} defaultValue={(qs.materials ?? []).map((m) => `${m.name} | ${m.unit} | ${m.unitCost}`).join("\n")} />
+            <span className="font-normal">Suggested in the quote builder as you type. Clear it to go back to the {b.trade.toLowerCase()} defaults.</span>
+          </label>
+          <label className="field sm:col-span-3">Terms (shown at the bottom of every quote)<textarea className="input font-normal" name="terms" rows={3} defaultValue={qs.terms} /></label>
         </ActionForm>
       </section>
 

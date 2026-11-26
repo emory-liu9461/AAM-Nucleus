@@ -4,7 +4,8 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { setLeadStage } from "@/app/actions";
 import { Badge } from "@/components/Badge";
-import { fmtDate, fmtDateTime, label, money } from "@/lib/format";
+import { fmtDate, fmtDateTime, label, money, moneyExact } from "@/lib/format";
+import { createQuote } from "@/app/quote-actions";
 import { can, requireBusinessPage } from "@/lib/session";
 import { transcript } from "@/lib/assistant";
 import { Transcript } from "@/components/Transcript";
@@ -38,6 +39,8 @@ export default async function LeadDetail({ params }: { params: Promise<{ slug: s
     .where(and(eq(leads.id, id), eq(leads.businessId, b.id)));
   if (!row) notFound();
   const { lead, contact: c, addedBy } = row;
+  const canQuote = can(user, "view_financials");
+  const leadQuotes = canQuote ? await db.select().from(schema.quotes).where(eq(schema.quotes.leadId, lead.id)).orderBy(desc(schema.quotes.createdAt)) : [];
   const [job] = await db.select({ id: jobs.id, name: jobs.name, status: jobs.status }).from(jobs).where(eq(jobs.leadId, lead.id));
   const others = await db.select({ id: leads.id, title: leads.title, stage: leads.stage, createdAt: leads.createdAt }).from(leads).where(and(eq(leads.contactId, c.id), eq(leads.businessId, b.id)));
   const [chat] = await db
@@ -81,6 +84,31 @@ export default async function LeadDetail({ params }: { params: Promise<{ slug: s
               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([c.address, c.city, c.zip].filter(Boolean).join(", "))}`}>Open in Google Maps ↗</a>
           )}
         </section>
+
+        {canQuote && (
+          <section className="card space-y-3 text-sm lg:col-span-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="card-title mb-0">Quotes</div>
+              <form action={createQuote.bind(null, b.slug, lead.id)}><button className="btn">+ New quote</button></form>
+            </div>
+            {leadQuotes.length === 0 ? (
+              <p className="text-muted">No quote yet. Build one from labour and materials; an owner or manager approves it before it goes to the customer.</p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {leadQuotes.map((q) => (
+                  <li key={q.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                    <Link className="font-medium hover:underline" href={`/b/${b.slug}/quotes/${q.id}`}>{q.number} · {q.title}</Link>
+                    <span className="flex items-center gap-3 text-xs text-muted">
+                      <span>Cost {money(q.cost)} · profit <span className={q.price - q.cost < 0 ? "text-bad" : "text-good"}>{money(q.price - q.cost)}</span></span>
+                      <span className="font-semibold text-ink">{moneyExact(q.total)}{q.taxAmount ? " incl. tax" : ""}</span>
+                      <Badge value={q.status} />
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
 
         <section className="card text-sm lg:col-span-2">
           <div className="card-title">Project</div>

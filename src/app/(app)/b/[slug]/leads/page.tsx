@@ -4,6 +4,8 @@ import { db, schema } from "@/db";
 import { createLead, setLeadStage } from "@/app/actions";
 import { requireBusinessPage } from "@/lib/session";
 import { messageFeed } from "@/lib/messages";
+import { latestQuotes } from "@/lib/quotes";
+import { can } from "@/lib/session";
 import { fmtDate, label, money } from "@/lib/format";
 import { Badge } from "@/components/Badge";
 
@@ -35,6 +37,20 @@ export default async function LeadsPage({ params, searchParams }: { params: Prom
         ]
       : [[null, rows]];
 
+  // Pipeline totals for open leads: a lead's latest quote (price before tax, cost), else its estimated value.
+  const money_ = can(user, "view_financials");
+  const openLeads = money_ ? await db.select({ id: leads.id, est: leads.estimatedValue }).from(leads).where(and(eq(leads.businessId, b.id), sql`${leads.stage} not in ('won','lost')`)) : [];
+  const lq = money_ ? new Map((await latestQuotes(b.id)).map((q) => [q.leadId, q])) : new Map();
+  const pipe = { revenue: 0, tax: 0, cost: 0, quotedRevenue: 0, quoted: 0, estimated: 0, toApprove: 0, sent: 0, sentValue: 0 };
+  for (const l of openLeads) {
+    const q = lq.get(l.id);
+    if (q && q.status !== "accepted") {
+      pipe.revenue += q.price; pipe.tax += q.total - q.price; pipe.cost += q.cost; pipe.quotedRevenue += q.price; pipe.quoted++;
+      if (q.status === "draft") pipe.toApprove++;
+      if (q.status === "sent") { pipe.sent++; pipe.sentValue += q.total; }
+    } else if (l.est) { pipe.revenue += l.est; pipe.estimated++; }
+  }
+
   const stageTotals = await db
     .select({ stage: leads.stage, c: sql<number>`count(*)`, v: sql<number>`coalesce(sum(${leads.estimatedValue}),0)` })
     .from(leads)
@@ -43,6 +59,15 @@ export default async function LeadsPage({ params, searchParams }: { params: Prom
 
   return (
     <div className="space-y-5">
+      {money_ && (
+        <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="card"><div className="text-xs text-muted">Potential revenue (open leads)</div><div className="mt-1 text-xl font-semibold">{money(pipe.revenue)}</div><div className="text-xs text-muted">{pipe.tax ? `${money(pipe.revenue + pipe.tax)} incl. tax · ` : ""}{pipe.quoted} quoted, {pipe.estimated} estimated</div></div>
+          <div className="card"><div className="text-xs text-muted">Estimated cost</div><div className="mt-1 text-xl font-semibold">{money(pipe.cost)}</div><div className="text-xs text-muted">from quotes (labour, materials, other)</div></div>
+          <div className="card"><div className="text-xs text-muted">Potential profit</div><div className={`mt-1 text-xl font-semibold ${pipe.quotedRevenue - pipe.cost < 0 ? "text-bad" : "text-good"}`}>{money(pipe.quotedRevenue - pipe.cost)}</div><div className="text-xs text-muted">{pipe.quotedRevenue ? `${Math.round(((pipe.quotedRevenue - pipe.cost) / pipe.quotedRevenue) * 100)}% margin on quoted leads` : "on quoted leads"}</div></div>
+          <div className="card"><div className="text-xs text-muted">Quotes waiting</div><div className="mt-1 text-xl font-semibold">{pipe.toApprove} to approve · {pipe.sent} sent</div><div className="text-xs text-muted">{pipe.sentValue ? `${money(pipe.sentValue)} out with customers` : "nothing out with customers"}</div></div>
+        </section>
+      )}
+
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {OPEN.map((s) => {
           const t = stageTotals.find((x) => x.stage === s);
