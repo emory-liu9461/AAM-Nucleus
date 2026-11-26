@@ -83,9 +83,13 @@ Daily jobs: `/api/cron/daily` (Vercel Cron, `CRON_SECRET`) syncs social stats an
 
 ## Messages (all conversations)
 
-**Messages** in the sidebar (with an unread count): every text, email, website chatbot conversation and call, across all the businesses a person can see. Unread first, then read; filter by Unread/Read, Leads/Customers (a customer has a job or a won lead), method (text, email, chatbot, calls) and business, and sort newest or oldest first. Click any item to see the whole conversation and reply (texts and emails), read the chatbot transcript, or play a voicemail.
+**Messages** in the sidebar (with an unread count): every text, WhatsApp message, email, website chatbot conversation, website quote form and call, across all the businesses a person can see. Unread first, then read; filter by Unread/Read, Leads/Customers (a customer has a job or a won lead), method (text, email, chatbot, calls) and business, and sort newest or oldest first. Click any item to see the whole conversation and reply (texts and emails), read the chatbot transcript, or play a voicemail.
 
 Read state is per person (`message_reads`): opening an item marks it read; it becomes unread again when the customer writes (or misses a call / leaves a voicemail) and nobody on the team has replied since. Items older than 30 days count as read unless marked unread. Opening a conversation in a business's Inbox also marks it read.
+
+## WhatsApp
+
+Customers can message a business on WhatsApp through Twilio. Once Twilio approves the WhatsApp sender (Console → Messaging → Senders → WhatsApp senders, using a Meta Business account), turn it on in **Inbox → Settings → WhatsApp** (and enter its number if it isn't the business's Twilio number), and set the sender's incoming-message webhook to the same `/api/twilio/sms` address as texts. WhatsApp conversations appear in the Inbox (WhatsApp filter), Messages and profiles; the AI assistant replies if AI replies to texts are on, and the team can reply. WhatsApp only allows free-form replies within 24 hours of the customer's last message.
 
 ## Lead and customer profiles
 

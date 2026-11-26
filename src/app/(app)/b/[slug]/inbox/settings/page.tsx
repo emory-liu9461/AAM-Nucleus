@@ -56,8 +56,20 @@ export default async function InboxSettings({ params }: { params: Promise<{ slug
             <label className="flex items-center gap-2"><input type="checkbox" name="whisper" defaultChecked={p.whisper} /> Say &ldquo;Call for {b.name}&rdquo; when you answer</label>
             <label className="flex items-center gap-2"><input type="checkbox" name="voicemail" defaultChecked={p.voicemail} /> Take a voicemail when nobody answers</label>
             <label className="flex items-center gap-2"><input type="checkbox" name="missedCallTextBack" defaultChecked={p.missedCallTextBack} /> Text missed callers automatically</label>
-            <label className="flex items-center gap-2"><input type="checkbox" name="smsAssistant" defaultChecked={p.smsAssistant} /> AI replies to texts (answers questions, books site visits)</label>
+            <label className="flex items-center gap-2"><input type="checkbox" name="smsAssistant" defaultChecked={p.smsAssistant} /> AI replies to texts and WhatsApp messages (answers questions, books site visits)</label>
           </div>
+          <fieldset className="space-y-2 rounded-lg border border-line p-3 text-sm sm:col-span-2">
+            <legend className="px-1 font-medium">WhatsApp</legend>
+            <label className="flex items-center gap-2"><input type="checkbox" name="whatsapp" defaultChecked={Boolean(b.phoneSettings?.whatsapp)} /> Customers can message this business on WhatsApp</label>
+            <label className="field">WhatsApp number (leave blank if it&apos;s the Twilio number above)
+              <input className="input" name="whatsappNumber" defaultValue={b.phoneSettings?.whatsappNumber ? prettyPhone(b.phoneSettings.whatsappNumber) : ""} placeholder="Same as the Twilio number" />
+            </label>
+            <p className="text-xs text-muted">
+              Turn this on after Twilio approves your WhatsApp sender (Twilio Console → Messaging → Senders → WhatsApp senders; it uses your Meta Business account and usually takes a few days).
+              In the sender&apos;s settings, set <strong>Webhook URL for incoming messages</strong> to the same address as texts: <span className="font-mono">{`${base}/api/twilio/sms`}</span>.
+              WhatsApp lets you reply freely within 24 hours of the customer&apos;s last message; after that, text or call them.
+            </p>
+          </fieldset>
           <label className="field sm:col-span-2">Missed-call text ({"{business}"} becomes the business name)
             <textarea className="input" name="missedCallMessage" rows={2} maxLength={320} defaultValue={b.phoneSettings?.missedCallMessage ?? ""} placeholder={DEFAULT_PHONE.missedCallMessage} />
           </label>

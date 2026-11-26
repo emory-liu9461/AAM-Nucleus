@@ -76,8 +76,8 @@ export const eventType = pgEnum("event_type", [
 ]);
 
 export const chatStatus = pgEnum("chat_status", ["open", "booked", "handoff", "closed"]);
-export const chatChannel = pgEnum("chat_channel", ["web", "sms", "email"]);
-export const inboxChannel = pgEnum("inbox_channel", ["sms", "email"]);
+export const chatChannel = pgEnum("chat_channel", ["web", "sms", "email", "whatsapp"]);
+export const inboxChannel = pgEnum("inbox_channel", ["sms", "email", "whatsapp"]);
 export const messageAuthor = pgEnum("message_author", ["customer", "assistant", "staff", "system"]);
 export const callStatus = pgEnum("call_status", ["ringing", "answered", "missed", "voicemail"]);
 
@@ -524,7 +524,9 @@ export type PhoneSettings = {
   voicemail?: boolean;
   missedCallTextBack?: boolean;
   missedCallMessage?: string;
-  smsAssistant?: boolean; // AI replies to texts
+  smsAssistant?: boolean; // AI replies to texts (and WhatsApp messages)
+  whatsapp?: boolean; // WhatsApp is turned on for this business in Twilio
+  whatsappNumber?: string; // the WhatsApp sender, E.164, if it isn't the business number
 };
 
 /** Page views on the public websites (no cookies; a per-tab session id groups a visit). */

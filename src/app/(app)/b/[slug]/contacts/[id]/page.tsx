@@ -69,7 +69,7 @@ export default async function ContactProfile({ params }: { params: Promise<{ slu
   const timeline: Entry[] = [
     ...msgs
       .filter((m) => !updates.some((u) => u.message === m.body)) // workflow messages are shown once, as job updates
-      .map((m) => ({ at: m.createdAt, kind: m.channel === "sms" ? "Text" : "Email", dir: m.direction as "in" | "out", title: m.direction === "in" ? `From ${name || "the customer"}` : `To ${name || "the customer"} · ${AUTHOR[m.author]}`, body: (m.subject ? `${m.subject}\n` : "") + m.body, href: `/messages/open/${m.conversationId}` })),
+      .map((m) => ({ at: m.createdAt, kind: m.channel === "sms" ? "Text" : m.channel === "whatsapp" ? "WhatsApp" : "Email", dir: m.direction as "in" | "out", title: m.direction === "in" ? `From ${name || "the customer"}` : `To ${name || "the customer"} · ${AUTHOR[m.author]}`, body: (m.subject ? `${m.subject}\n` : "") + m.body, href: `/messages/open/${m.conversationId}` })),
     ...convs
       .filter((x) => x.channel === "web" && x.userTurns > 0)
       .map((x) => ({ at: x.createdAt, kind: "Chatbot", dir: "in" as const, title: `Website chat${x.status === "booked" ? " · booked a visit" : x.status === "handoff" ? " · asked for a person" : ""}`, body: x.summary, extra: <details className="mt-1"><summary className="cursor-pointer text-xs text-accent">Show the conversation</summary><Transcript lines={transcript(x.messages)} /></details> })),
@@ -107,7 +107,7 @@ export default async function ContactProfile({ params }: { params: Promise<{ slu
         </div>
         <div className="flex flex-wrap gap-2">
           {convs.filter((x) => x.channel !== "web").map((x) => (
-            <a key={x.id} className="btn-ghost text-sm" href={`/messages/open/${x.id}`}>{x.channel === "sms" ? "Text conversation" : "Email conversation"}</a>
+            <a key={x.id} className="btn-ghost text-sm" href={`/messages/open/${x.id}`}>{x.channel === "sms" ? "Text conversation" : x.channel === "whatsapp" ? "WhatsApp conversation" : "Email conversation"}</a>
           ))}
         </div>
       </header>
@@ -156,7 +156,7 @@ export default async function ContactProfile({ params }: { params: Promise<{ slu
           </Section>
 
           <Section title="Conversation history">
-            <p className="-mt-1 mb-2 text-xs text-muted">Every text, email, chatbot conversation, call and automatic update, newest first.</p>
+            <p className="-mt-1 mb-2 text-xs text-muted">Every text, WhatsApp message, email, chatbot conversation, website form, call and automatic update, newest first.</p>
             {timeline.length === 0 ? <Empty>Nothing yet.</Empty> : (
               <ol className="space-y-3">
                 {timeline.map((e, i) => (

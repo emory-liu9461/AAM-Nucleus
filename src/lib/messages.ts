@@ -15,7 +15,7 @@ import { transcript } from "./assistant";
 
 const { chatConversations, inboxMessages, contacts, leads, calls, messageReads } = schema;
 
-export type MessageKind = "sms" | "email" | "chat" | "call";
+export type MessageKind = "sms" | "whatsapp" | "email" | "chat" | "form" | "call";
 export type MessageItem = {
   kind: MessageKind;
   id: string;
@@ -118,8 +118,8 @@ export async function messageFeed(userId: string, list: Business[]): Promise<Mes
       kind: c.channel === "web" ? "chat" : c.channel,
       id: c.id,
       business: b,
-      name: person || (c.channel === "sms" ? prettyPhone(c.address) : c.channel === "email" ? c.address ?? "" : "Website visitor"),
-      sub: c.channel === "sms" ? prettyPhone(c.address) : c.channel === "email" ? c.address ?? "" : phone ? prettyPhone(phone) : "Website chat",
+      name: person || (c.channel === "sms" || c.channel === "whatsapp" ? prettyPhone(c.address) : c.channel === "email" ? c.address ?? "" : "Website visitor"),
+      sub: c.channel === "sms" || c.channel === "whatsapp" ? prettyPhone(c.address) : c.channel === "email" ? c.address ?? "" : phone ? prettyPhone(phone) : "Website chat",
       snippet: snippet.replace(/\s+/g, " ").slice(0, 180),
       from,
       at,
@@ -131,6 +131,38 @@ export async function messageFeed(userId: string, list: Business[]): Promise<Mes
       flag: c.status === "handoff" ? "Needs follow-up" : c.status === "booked" ? "Booked" : optOut && c.channel === "sms" ? "Opted out" : null,
     });
   }
+  // Website quote forms: each request is an item (read state keyed by the lead).
+  const forms = await db
+    .select({ l: leads, first: contacts.firstName, last: contacts.lastName, phone: contacts.phone, email: contacts.email })
+    .from(leads)
+    .innerJoin(contacts, eq(contacts.id, leads.contactId))
+    .where(and(inArray(leads.businessId, ids), sql`coalesce(${leads.attribution}->>'channel', '') in ('site','hosted','embed','api')`))
+    .orderBy(desc(leads.createdAt))
+    .limit(LIMIT);
+  const formReads = forms.length ? await db.select().from(messageReads).where(and(eq(messageReads.userId, userId), inArray(messageReads.itemId, forms.map((f) => f.l.id)))) : [];
+  const formReadOf = new Map(formReads.map((r) => [r.itemId, r]));
+  for (const { l, first, last, phone, email } of forms) {
+    const read = formReadOf.get(l.id);
+    // New requests nobody has handled yet are unread; moving the lead past "New" counts as handled.
+    const unread = read ? read.readAt === null : l.stage === "new" && l.createdAt.getTime() > STALE();
+    items.push({
+      kind: "form",
+      id: l.id,
+      business: biz.get(l.businessId)!,
+      name: `${first} ${last}`.trim() || email || "Website visitor",
+      sub: [phone ? prettyPhone(phone) : null, email].filter(Boolean).join(" · ") || "Website form",
+      snippet: [l.title, l.notes].filter(Boolean).join(" · ").replace(/\s+/g, " ").slice(0, 180),
+      from: "customer",
+      at: l.createdAt,
+      unread,
+      leadId: l.id,
+      leadStage: l.stage,
+      contactId: l.contactId,
+      who: "lead",
+      flag: l.intake?.timeline?.startsWith("As soon") ? "Urgent" : null,
+    });
+  }
+
   for (const { call, first, last, leadId, stage } of callRows) {
     const b = biz.get(call.businessId)!;
     const read = readOf.get(call.id);

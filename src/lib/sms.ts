@@ -14,7 +14,7 @@ import { notify } from "./alerts";
 
 const { businesses, contacts, leads, chatConversations, inboxMessages } = schema;
 
-export const DEFAULT_PHONE: Required<Omit<PhoneSettings, "number" | "forwardTo">> = {
+export const DEFAULT_PHONE: Required<Omit<PhoneSettings, "number" | "forwardTo" | "whatsapp" | "whatsappNumber">> = {
   ringSeconds: 20,
   whisper: true,
   voicemail: true,
@@ -35,14 +35,22 @@ export function phoneSettings(b: Pick<Business, "phoneSettings">) {
 
 /** Which business owns the Twilio number that was called or texted. */
 export async function businessByTwilioNumber(to: string) {
-  const n = toE164(to);
+  const n = toE164(to.replace(/^whatsapp:/i, ""));
   if (!n) return null;
   const [b] = await db
     .select()
     .from(businesses)
-    .where(and(sql`${businesses.phoneSettings}->>'number' = ${n}`, eq(businesses.archived, false)));
+    .where(and(sql`(${businesses.phoneSettings}->>'number' = ${n} or ${businesses.phoneSettings}->>'whatsappNumber' = ${n})`, eq(businesses.archived, false)));
   return b ?? null;
 }
+
+export type TextChannel = "sms" | "whatsapp";
+/** Twilio addresses WhatsApp numbers as "whatsapp:+1…". */
+const twilioAddr = (n: string, ch: TextChannel) => (ch === "whatsapp" ? `whatsapp:${n}` : n);
+export const whatsappSender = (b: Pick<Business, "phoneSettings">) => {
+  const p = phoneSettings(b);
+  return b.phoneSettings?.whatsapp ? (b.phoneSettings.whatsappNumber || p.number) : null;
+};
 
 /** Find the contact for a phone number (matching on digits), or create one named after the number. */
 export async function contactForPhone(b: Business, phone: string): Promise<Contact> {
@@ -59,7 +67,7 @@ export async function contactForPhone(b: Business, phone: string): Promise<Conta
 }
 
 /** An open lead for this contact from the last 60 days, or a new one ("Text message" / "Missed call"). */
-export async function leadForContact(b: Business, contact: Contact, title: "Text message" | "Missed call") {
+export async function leadForContact(b: Business, contact: Contact, title: "Text message" | "Missed call" | "WhatsApp message") {
   const since = new Date(Date.now() - 60 * 864e5);
   const [open] = await db
     .select({ id: leads.id })
@@ -70,18 +78,18 @@ export async function leadForContact(b: Business, contact: Contact, title: "Text
   if (open) return { id: open.id, created: false };
   const [l] = await db
     .insert(leads)
-    .values({ businessId: b.id, contactId: contact.id, title, source: contact.source === "phone" ? "phone" : contact.source, attribution: { channel: "chat", formName: title === "Missed call" ? "phone-call" : "sms" } })
+    .values({ businessId: b.id, contactId: contact.id, title, source: contact.source === "phone" ? "phone" : contact.source, attribution: { channel: "chat", formName: title === "Missed call" ? "phone-call" : title === "WhatsApp message" ? "whatsapp" : "sms" } })
     .returning({ id: leads.id });
   return { id: l.id, created: true };
 }
 
 /** The ongoing text conversation with this number, or a new one. */
-export async function smsConversation(b: Business, phone: string, contact: Contact, leadId: string | null): Promise<ChatConversation> {
+export async function smsConversation(b: Business, phone: string, contact: Contact, leadId: string | null, channel: TextChannel = "sms"): Promise<ChatConversation> {
   const since = new Date(Date.now() - 30 * 864e5);
   const [existing] = await db
     .select()
     .from(chatConversations)
-    .where(and(eq(chatConversations.businessId, b.id), eq(chatConversations.channel, "sms"), eq(chatConversations.address, phone), gte(chatConversations.updatedAt, since)))
+    .where(and(eq(chatConversations.businessId, b.id), eq(chatConversations.channel, channel), eq(chatConversations.address, phone), gte(chatConversations.updatedAt, since)))
     .orderBy(desc(chatConversations.updatedAt))
     .limit(1);
   if (existing) {
@@ -93,7 +101,7 @@ export async function smsConversation(b: Business, phone: string, contact: Conta
   }
   const [c] = await db
     .insert(chatConversations)
-    .values({ businessId: b.id, channel: "sms", address: phone, token: randomBytes(24).toString("hex"), contactId: contact.id, leadId, attribution: { channel: "chat", formName: "sms" } })
+    .values({ businessId: b.id, channel, address: phone, token: randomBytes(24).toString("hex"), contactId: contact.id, leadId, attribution: { channel: "chat", formName: channel } })
     .returning();
   return c;
 }
@@ -106,12 +114,14 @@ export async function sendBusinessSms(
   b: Business,
   to: string,
   body: string,
-  opts: { conversationId?: string | null; contactId?: string | null; author: "assistant" | "staff" | "system"; sentById?: string | null; statusCallback?: string },
+  opts: { conversationId?: string | null; contactId?: string | null; author: "assistant" | "staff" | "system"; sentById?: string | null; statusCallback?: string; channel?: TextChannel },
 ) {
   const p = phoneSettings(b);
-  if (!p.number) return { error: "This business has no phone number set up." } as const;
+  const channel = opts.channel ?? "sms";
+  const from = channel === "whatsapp" ? whatsappSender(b) : p.number;
+  if (!from) return { error: channel === "whatsapp" ? "WhatsApp isn't turned on for this business (Inbox → Settings)." : "This business has no phone number set up." } as const;
   if (!twilioConfigured()) return { error: "Twilio isn't connected (add TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN)." } as const;
-  if (opts.contactId) {
+  if (opts.contactId && channel === "sms") {
     const [c] = await db.select({ out: contacts.smsOptOut }).from(contacts).where(eq(contacts.id, opts.contactId));
     if (c?.out) return { error: "This customer replied STOP, so they can't be texted until they reply START." } as const;
   }
@@ -120,17 +130,19 @@ export async function sendBusinessSms(
   let status = "sent";
   let error: string | undefined;
   try {
-    sid = await sendTwilioSms(p.number, to, text, opts.statusCallback);
+    sid = await sendTwilioSms(twilioAddr(from, channel), twilioAddr(to, channel), text, opts.statusCallback);
   } catch (e) {
     status = "failed";
     error = e instanceof Error ? e.message : "send failed";
+    // WhatsApp only allows free-form replies within 24 hours of the customer's last message.
+    if (channel === "whatsapp" && /63016/.test(error)) error = "WhatsApp only allows replies within 24 hours of the customer's last message. Text or call them instead.";
     console.error("sms send failed", error);
   }
   const [m] = await db
     .insert(inboxMessages)
     .values({
-      channel: "sms", businessId: b.id, conversationId: opts.conversationId ?? null, contactId: opts.contactId ?? null,
-      direction: "out", author: opts.author, body: text, fromAddr: p.number, toAddr: to, externalId: sid, status, sentById: opts.sentById ?? null,
+      channel, businessId: b.id, conversationId: opts.conversationId ?? null, contactId: opts.contactId ?? null,
+      direction: "out", author: opts.author, body: text, fromAddr: from, toAddr: to, externalId: sid, status, sentById: opts.sentById ?? null,
     })
     .returning();
   if (opts.conversationId) await db.update(chatConversations).set({ updatedAt: new Date() }).where(eq(chatConversations.id, opts.conversationId));
@@ -138,35 +150,38 @@ export async function sendBusinessSms(
 }
 
 /** Handle one incoming text. Logs it, handles STOP/START, and (if on) lets the AI reply. */
-export async function handleInboundSms(b: Business, from: string, body: string, sid: string | null) {
+export async function handleInboundSms(b: Business, rawFrom: string, body: string, sid: string | null) {
+  const channel: TextChannel = /^whatsapp:/i.test(rawFrom) ? "whatsapp" : "sms";
+  const from = rawFrom.replace(/^whatsapp:/i, "");
   const phone = toE164(from) ?? from;
   const contact = await contactForPhone(b, phone);
-  const lead = await leadForContact(b, contact, "Text message");
+  const lead = await leadForContact(b, contact, channel === "whatsapp" ? "WhatsApp message" : "Text message");
   const leadId = lead.id;
-  const conv = await smsConversation(b, phone, contact, leadId);
+  const conv = await smsConversation(b, phone, contact, leadId, channel);
   const p = phoneSettings(b);
   await db.insert(inboxMessages).values({
-    channel: "sms", businessId: b.id, conversationId: conv.id, contactId: contact.id, direction: "in", author: "customer",
-    body: body.slice(0, 1600), fromAddr: phone, toAddr: p.number ?? "", externalId: sid, status: "received",
+    channel, businessId: b.id, conversationId: conv.id, contactId: contact.id, direction: "in", author: "customer",
+    body: body.slice(0, 1600), fromAddr: phone, toAddr: (channel === "whatsapp" ? whatsappSender(b) : p.number) ?? "", externalId: sid, status: "received",
   });
   await db.update(chatConversations).set({ updatedAt: new Date() }).where(eq(chatConversations.id, conv.id));
 
   // Twilio sends the carrier-required STOP/START confirmations itself; we just record the choice.
-  if (OPT_OUT.test(body)) {
+  // (WhatsApp has its own block/opt-out, so this is for texts only.)
+  if (channel === "sms" && OPT_OUT.test(body)) {
     await db.update(contacts).set({ smsOptOut: true }).where(eq(contacts.id, contact.id));
     return { replied: false, reason: "opted-out" };
   }
-  if (OPT_IN.test(body) && contact.smsOptOut) {
+  if (channel === "sms" && OPT_IN.test(body) && contact.smsOptOut) {
     await db.update(contacts).set({ smsOptOut: false }).where(eq(contacts.id, contact.id));
     return { replied: false, reason: "opted-in" };
   }
-  if (contact.smsOptOut) return { replied: false, reason: "opted-out" };
+  if (channel === "sms" && contact.smsOptOut) return { replied: false, reason: "opted-out" };
   const who = /^[+(\d]/.test(contact.firstName) ? prettyPhone(phone) : `${contact.firstName} ${contact.lastName}`.trim();
   const aiOff = !p.smsAssistant || conv.aiPaused || !assistantConfigured();
   if (lead.created) {
-    await notify(b, "newLead", { title: `New text from ${who}`, detail: `"${body.slice(0, 120)}"${aiOff ? "" : " · the AI is replying"}`, path: `/b/${b.slug}/inbox?c=${conv.id}` });
+    await notify(b, "newLead", { title: `New ${channel === "whatsapp" ? "WhatsApp message" : "text"} from ${who}`, detail: `"${body.slice(0, 120)}"${aiOff ? "" : " · the AI is replying"}`, path: `/b/${b.slug}/inbox?c=${conv.id}` });
   } else if (aiOff && !(await alertedRecently(conv.id))) {
-    await notify(b, "needsReply", { title: `Text from ${who} needs a reply`, detail: `"${body.slice(0, 120)}"`, path: `/b/${b.slug}/inbox?c=${conv.id}` });
+    await notify(b, "needsReply", { title: `${channel === "whatsapp" ? "WhatsApp message" : "Text"} from ${who} needs a reply`, detail: `"${body.slice(0, 120)}"`, path: `/b/${b.slug}/inbox?c=${conv.id}` });
   }
   if (aiOff) return { replied: false, reason: "ai-off" };
 
@@ -176,9 +191,9 @@ export async function handleInboundSms(b: Business, from: string, body: string, 
     const [fresh] = await db.select().from(chatConversations).where(eq(chatConversations.id, conv.id));
     if (!fresh || fresh.aiPaused) return { replied: false, reason: "ai-off" };
     if (fresh.userTurns >= 40) return { replied: false, reason: "limit" };
-    const turn = await chatTurn(b, fresh, body, `sms:${phone}`);
+    const turn = await chatTurn(b, fresh, body, `${channel}:${phone}`);
     if (!turn.reply) return { replied: false, reason: "no-reply" };
-    const sent = await sendBusinessSms(b, phone, turn.reply, { conversationId: conv.id, contactId: contact.id, author: "assistant" });
+    const sent = await sendBusinessSms(b, phone, turn.reply, { conversationId: conv.id, contactId: contact.id, author: "assistant", channel });
     return { replied: !("error" in sent && sent.error), reason: "ai" };
   });
 }
@@ -227,7 +242,7 @@ export async function smsThreads(businessId: string, limit = 50) {
     .select({ conv: chatConversations, contact: contacts })
     .from(chatConversations)
     .leftJoin(contacts, eq(contacts.id, chatConversations.contactId))
-    .where(and(eq(chatConversations.businessId, businessId), inArray(chatConversations.channel, ["sms", "email"])))
+    .where(and(eq(chatConversations.businessId, businessId), inArray(chatConversations.channel, ["sms", "email", "whatsapp"])))
     .orderBy(desc(chatConversations.updatedAt))
     .limit(limit);
   if (!convs.length) return [];

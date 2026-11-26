@@ -16,24 +16,24 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
   const { business: b, user } = await requireBusinessPage(slug);
   if (c && /^[0-9a-f-]{36}$/.test(c)) await setRead(user.id, c, true).catch(() => {}); // opening it here counts as read on the Messages page
   const all = await smsThreads(b.id, 100);
-  const threads = ch === "sms" || ch === "email" ? all.filter((t) => t.conv.channel === ch) : all;
+  const threads = ch === "sms" || ch === "email" || ch === "whatsapp" ? all.filter((t) => t.conv.channel === ch) : all;
   const active = threads.find((t) => t.conv.id === c) ?? threads[0];
   const msgs = active
     ? await db.select().from(schema.inboxMessages).where(and(eq(schema.inboxMessages.conversationId, active.conv.id), eq(schema.inboxMessages.businessId, b.id))).orderBy(asc(schema.inboxMessages.createdAt))
     : [];
   const who = (t: (typeof all)[number]) =>
-    t.contact ? `${t.contact.firstName} ${t.contact.lastName}`.trim() : t.conv.channel === "sms" ? prettyPhone(t.conv.address) : t.conv.address;
+    t.contact ? `${t.contact.firstName} ${t.contact.lastName}`.trim() : t.conv.channel === "email" ? t.conv.address : prettyPhone(t.conv.address);
   const href = (id: string) => `?${new URLSearchParams({ ...(ch ? { ch } : {}), c: id })}`;
 
   return (
     <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
       <aside className="card p-0">
         <div className="flex gap-1 border-b border-line p-2 text-xs">
-          {[["", "All"], ["sms", "Texts"], ["email", "Email"]].map(([v, l]) => (
+          {[["", "All"], ["sms", "Texts"], ["whatsapp", "WhatsApp"], ["email", "Email"]].map(([v, l]) => (
             <a key={l} href={v ? `?ch=${v}` : "?"} className={`rounded-md px-2.5 py-1 ${(ch ?? "") === v ? "bg-bg font-semibold" : "text-muted"}`}>{l}</a>
           ))}
         </div>
-        {threads.length === 0 && <p className="p-4 text-sm text-muted">No conversations yet. Texts and emails to this business appear here.</p>}
+        {threads.length === 0 && <p className="p-4 text-sm text-muted">No conversations yet. Texts, WhatsApp messages and emails to this business appear here.</p>}
         <ul className="max-h-[70vh] divide-y divide-line overflow-y-auto">
           {threads.map((t) => {
             const waiting = t.last?.author === "customer";
@@ -41,7 +41,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
               <li key={t.conv.id}>
                 <Link href={href(t.conv.id)} className={`block px-3 py-2.5 hover:bg-bg ${active?.conv.id === t.conv.id ? "bg-bg" : ""}`}>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">{t.conv.channel === "sms" ? "Text" : "Email"}</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">{t.conv.channel === "sms" ? "Text" : t.conv.channel === "whatsapp" ? "WhatsApp" : "Email"}</span>
                     <span className={`min-w-0 flex-1 truncate text-sm ${waiting ? "font-semibold" : ""}`}>{who(t)}</span>
                     {waiting && <span className="h-2 w-2 rounded-full bg-accent" title="Waiting for a reply" />}
                   </div>
@@ -65,7 +65,7 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
           <header className="flex flex-wrap items-center gap-3 border-b border-line p-3">
             <div className="min-w-0 flex-1">
               <div className="font-semibold">{who(active)}</div>
-              <div className="text-xs text-muted">{active.conv.channel === "sms" ? prettyPhone(active.conv.address) : active.conv.address}</div>
+              <div className="text-xs text-muted">{active.conv.channel === "email" ? active.conv.address : `${active.conv.channel === "whatsapp" ? "WhatsApp · " : ""}${prettyPhone(active.conv.address)}`}</div>
             </div>
             {active.conv.leadId && <Link className="btn-ghost text-xs" href={`/b/${b.slug}/leads/${active.conv.leadId}`}>View lead</Link>}
             <form action={setConversationAi.bind(null, b.slug, active.conv.id, !active.conv.aiPaused)}>
@@ -86,8 +86,8 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
               </div>
             ))}
           </div>
-          <ActionForm action={sendInboxReply.bind(null, b.slug, active.conv.id)} submit={active.conv.channel === "sms" ? "Send text" : "Send email"} pendingText="Sending…" className="space-y-2 border-t border-line p-3" resetOnSuccess>
-            <textarea name="body" required rows={active.conv.channel === "sms" ? 2 : 5} className="input" placeholder={active.conv.channel === "sms" ? "Type a text…" : "Write your reply… (your signature is added automatically)"} />
+          <ActionForm action={sendInboxReply.bind(null, b.slug, active.conv.id)} submit={active.conv.channel === "sms" ? "Send text" : active.conv.channel === "whatsapp" ? "Send WhatsApp" : "Send email"} pendingText="Sending…" className="space-y-2 border-t border-line p-3" resetOnSuccess>
+            <textarea name="body" required rows={active.conv.channel === "email" ? 5 : 2} className="input" placeholder={active.conv.channel === "email" ? "Write your reply… (your signature is added automatically)" : "Type a message…"} />
             <p className="text-xs text-muted">Replying yourself pauses the AI for this conversation.</p>
           </ActionForm>
         </section>

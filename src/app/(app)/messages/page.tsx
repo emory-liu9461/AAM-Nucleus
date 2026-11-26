@@ -17,7 +17,7 @@ import { transcript } from "@/lib/assistant";
 
 export const dynamic = "force-dynamic";
 
-const KIND: Record<string, string> = { sms: "Text", email: "Email", chat: "Chatbot", call: "Call" };
+const KIND: Record<string, string> = { sms: "Text", whatsapp: "WhatsApp", email: "Email", chat: "Chatbot", form: "Website form", call: "Call" };
 const FROM: Record<string, string> = { team: "You: ", ai: "AI: ", auto: "Automatic: ", customer: "" };
 
 type Q = { view?: string; who?: string; via?: string; b?: string; sort?: string; open?: string };
@@ -58,7 +58,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Messages</h1>
-          <p className="text-sm text-muted">Every text, email, chatbot conversation and call with your leads and customers{businesses.length > 1 ? ", across all businesses" : ""}.</p>
+          <p className="text-sm text-muted">Every text, WhatsApp message, email, chatbot conversation, website form and call with your leads and customers{businesses.length > 1 ? ", across all businesses" : ""}.</p>
         </div>
         {totalUnread > 0 && (
           <form action={markAllRead.bind(null, q.b ?? null)}>
@@ -68,10 +68,10 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
       </div>
 
       <div className="card flex flex-wrap items-center gap-x-5 gap-y-2 p-2 text-sm">
-        <div className="flex gap-1"><Pill k="view" v="" text="All" count={all.length} /><Pill k="view" v="unread" text="Unread" count={totalUnread} /><Pill k="view" v="read" text="Read" /></div>
-        <div className="flex gap-1"><Pill k="who" v="" text="Everyone" /><Pill k="who" v="lead" text="Leads" /><Pill k="who" v="customer" text="Customers" /></div>
-        <div className="flex gap-1"><Pill k="via" v="" text="All methods" /><Pill k="via" v="sms" text="Text" /><Pill k="via" v="email" text="Email" /><Pill k="via" v="chat" text="Chatbot" /><Pill k="via" v="call" text="Calls" /></div>
-        <div className="flex gap-1"><Pill k="sort" v="" text="Newest first" /><Pill k="sort" v="old" text="Oldest first" /></div>
+        <div className="flex flex-wrap gap-1"><Pill k="view" v="" text="All" count={all.length} /><Pill k="view" v="unread" text="Unread" count={totalUnread} /><Pill k="view" v="read" text="Read" /></div>
+        <div className="flex flex-wrap gap-1"><Pill k="who" v="" text="Everyone" /><Pill k="who" v="lead" text="Leads" /><Pill k="who" v="customer" text="Customers" /></div>
+        <div className="flex flex-wrap gap-1"><Pill k="via" v="" text="All methods" /><Pill k="via" v="sms" text="Text" /><Pill k="via" v="whatsapp" text="WhatsApp" /><Pill k="via" v="email" text="Email" /><Pill k="via" v="chat" text="Chatbot" /><Pill k="via" v="form" text="Website form" /><Pill k="via" v="call" text="Calls" /></div>
+        <div className="flex flex-wrap gap-1"><Pill k="sort" v="" text="Newest first" /><Pill k="sort" v="old" text="Oldest first" /></div>
         {businesses.length > 1 && (
           <div className="flex flex-wrap gap-1">
             <Pill k="b" v="" text="All businesses" />
@@ -82,7 +82,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
 
       <div className="grid gap-4 lg:grid-cols-[400px_1fr]">
         <aside className="card p-0">
-          {filtered.length === 0 && <p className="p-4 text-sm text-muted">Nothing here. Texts, emails, website chats and calls appear as they come in.</p>}
+          {filtered.length === 0 && <p className="p-4 text-sm text-muted">Nothing here. Texts, WhatsApp messages, emails, website chats, quote forms and calls appear as they come in.</p>}
           <div className="max-h-[75vh] overflow-y-auto">
             {[["Unread", unread], ["Read", read]].map(([title, list]) =>
               (list as MessageItem[]).length ? (
@@ -158,6 +158,41 @@ async function Detail({ i }: { i: MessageItem }) {
     );
   }
 
+  if (i.kind === "form") {
+    const [lead] = await db.select().from(schema.leads).where(eq(schema.leads.id, i.id));
+    const [c] = lead ? await db.select().from(schema.contacts).where(eq(schema.contacts.id, lead.contactId)) : [];
+    const it = lead?.intake ?? {};
+    const answers: [string, string | undefined][] = [
+      ["When", it.timeline], ["Budget", it.budgetRange], ["Property", it.propertyType], ["Owns it", it.homeowner],
+      ["Preferred visit day", it.preferredDate], ["Best way to reach", it.contactMethod], ["Best time", it.bestTime],
+      ["Heard about you", it.heardAbout], ["Address", [c?.address, c?.city, it.zip ?? c?.zip].filter(Boolean).join(", ") || undefined],
+      ["Offers and tips", it.marketingConsent === "yes" ? "Yes, OK to send" : undefined],
+    ];
+    const digits = (c?.phone ?? "").replace(/[^\d+]/g, "");
+    return (
+      <section className="card flex flex-col p-0">
+        {header}
+        <div className="space-y-3 p-4 text-sm">
+          <div className="font-semibold">{lead?.title}</div>
+          {lead?.notes && <p className="whitespace-pre-wrap rounded-lg bg-bg p-3">{lead.notes}</p>}
+          <dl className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
+            {answers.filter(([, v]) => v).map(([k, v]) => (
+              <div key={k} className="flex gap-2"><dt className="text-muted">{k}:</dt><dd>{v}</dd></div>
+            ))}
+          </dl>
+          {lead?.attribution?.page && <p className="text-xs text-muted">Sent from {lead.attribution.page}{lead.attribution.utmSource ? ` · ad: ${lead.attribution.utmSource}${lead.attribution.utmCampaign ? ` / ${lead.attribution.utmCampaign}` : ""}` : ""}</p>}
+          <div className="flex flex-wrap gap-2 pt-1">
+            {digits && <a className="btn" href={`tel:${digits}`}>Call</a>}
+            {digits && <a className="btn-ghost" href={`sms:${digits}`}>Text</a>}
+            {c?.email && <a className="btn-ghost" href={`mailto:${c.email}?subject=${encodeURIComponent(`Your ${lead?.title ?? "quote"} request`)}`}>Email</a>}
+            <Link className="btn-ghost" href={`/b/${b.slug}/leads/${i.id}`}>Open lead</Link>
+          </div>
+          <p className="text-xs text-muted">Moving the lead past &ldquo;New&rdquo; (e.g. Contacted) also marks this as handled.</p>
+        </div>
+      </section>
+    );
+  }
+
   if (i.kind === "chat") {
     const [conv] = await db.select().from(schema.chatConversations).where(eq(schema.chatConversations.id, i.id));
     return (
@@ -188,8 +223,8 @@ async function Detail({ i }: { i: MessageItem }) {
           </div>
         ))}
       </div>
-      <ActionForm action={sendInboxReply.bind(null, b.slug, i.id)} submit={i.kind === "sms" ? "Send text" : "Send email"} pendingText="Sending…" className="space-y-2 border-t border-line p-3" resetOnSuccess>
-        <textarea name="body" required rows={i.kind === "sms" ? 2 : 5} className="input" placeholder={i.kind === "sms" ? "Type a text…" : "Write your reply… (your signature is added automatically)"} />
+      <ActionForm action={sendInboxReply.bind(null, b.slug, i.id)} submit={i.kind === "sms" ? "Send text" : i.kind === "whatsapp" ? "Send WhatsApp" : "Send email"} pendingText="Sending…" className="space-y-2 border-t border-line p-3" resetOnSuccess>
+        <textarea name="body" required rows={i.kind === "email" ? 5 : 2} className="input" placeholder={i.kind === "email" ? "Write your reply… (your signature is added automatically)" : "Type a message…"} />
         <p className="text-xs text-muted">Sent from {b.name}. Replying yourself pauses the AI for this conversation.</p>
       </ActionForm>
     </section>

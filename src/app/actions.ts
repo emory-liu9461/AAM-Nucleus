@@ -476,11 +476,11 @@ async function inboxConversation(slug: string, conversationId: string) {
 
 export async function sendInboxReply(slug: string, conversationId: string, _: { error?: string; ok?: string } | null, form: FormData) {
   const { business: b, user, conv } = await inboxConversation(slug, conversationId);
-  const body = (str(form, "body") ?? "").slice(0, conv.channel === "sms" ? 1500 : 20000);
+  const body = (str(form, "body") ?? "").slice(0, conv.channel === "email" ? 20000 : 1500);
   if (!body) return { error: "Type a message first" };
   let result;
-  if (conv.channel === "sms") {
-    result = await sendBusinessSms(b, conv.address!, body, { conversationId: conv.id, contactId: conv.contactId, author: "staff", sentById: user.id });
+  if (conv.channel === "sms" || conv.channel === "whatsapp") {
+    result = await sendBusinessSms(b, conv.address!, body, { conversationId: conv.id, contactId: conv.contactId, author: "staff", sentById: user.id, channel: conv.channel });
   } else {
     const [lastIn] = await db
       .select()
@@ -527,7 +527,16 @@ export async function updatePhoneSettings(slug: string, _: { error?: string; ok?
     missedCallTextBack: form.get("missedCallTextBack") === "on",
     missedCallMessage: (str(form, "missedCallMessage") ?? "").slice(0, 320) || undefined,
     smsAssistant: form.get("smsAssistant") === "on",
+    whatsapp: form.get("whatsapp") === "on" || undefined,
+    whatsappNumber: undefined,
   };
+  const rawWa = str(form, "whatsappNumber");
+  if (rawWa) {
+    const wa = toE164(rawWa);
+    if (!wa) return { error: "The WhatsApp number should look like +15551234567" };
+    if (wa !== number) phoneSettings.whatsappNumber = wa;
+  }
+  if (phoneSettings.whatsapp && !number && !phoneSettings.whatsappNumber) return { error: "Add the Twilio number (or a WhatsApp number) before turning on WhatsApp" };
   await db.update(businesses).set({ phoneSettings }).where(eq(businesses.id, b.id));
   revalidatePath(`/b/${slug}/inbox`, "layout");
   return { ok: "Phone settings saved" };

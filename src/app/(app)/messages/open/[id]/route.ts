@@ -14,7 +14,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (s && /^[0-9a-f-]{36}$/.test(id)) {
     const [conv] = await db.select({ b: schema.chatConversations.businessId }).from(schema.chatConversations).where(eq(schema.chatConversations.id, id));
     const [call] = conv ? [] : await db.select({ b: schema.calls.businessId }).from(schema.calls).where(eq(schema.calls.id, id));
-    const bid = conv?.b ?? call?.b;
+    const [lead] = conv || call ? [] : await db.select({ b: schema.leads.businessId }).from(schema.leads).where(eq(schema.leads.id, id));
+    const bid = conv?.b ?? call?.b ?? lead?.b;
     if (bid && s.businesses.some((b) => b.id === bid)) await setRead(s.user.id, id, true);
   }
   return NextResponse.redirect(new URL(`/messages?${back}`, url), 303);

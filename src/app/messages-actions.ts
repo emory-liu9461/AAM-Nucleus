@@ -12,7 +12,8 @@ async function allowed(itemId: string) {
   if (!/^[0-9a-f-]{36}$/.test(itemId)) return null;
   const [conv] = await db.select({ b: schema.chatConversations.businessId }).from(schema.chatConversations).where(eq(schema.chatConversations.id, itemId));
   const [call] = conv ? [] : await db.select({ b: schema.calls.businessId }).from(schema.calls).where(eq(schema.calls.id, itemId));
-  const bid = conv?.b ?? call?.b;
+  const [lead] = conv || call ? [] : await db.select({ b: schema.leads.businessId }).from(schema.leads).where(eq(schema.leads.id, itemId));
+  const bid = conv?.b ?? call?.b ?? lead?.b;
   return bid && s.businesses.some((b) => b.id === bid) ? s : null;
 }
 

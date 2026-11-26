@@ -131,7 +131,7 @@ export default async function LeadDetail({ params }: { params: Promise<{ slug: s
           </div>
           <ul className="divide-y divide-line text-sm">
             {[
-              ...inbox.map((m) => ({ at: m.createdAt, key: m.id, text: `${m.channel === "sms" ? "Text" : "Email"} ${m.direction === "in" ? "from customer" : m.author === "assistant" ? "from AI assistant" : m.author === "staff" ? "from team" : "(automatic)"}`, body: m.body })),
+              ...inbox.map((m) => ({ at: m.createdAt, key: m.id, text: `${m.channel === "sms" ? "Text" : m.channel === "whatsapp" ? "WhatsApp message" : "Email"} ${m.direction === "in" ? "from customer" : m.author === "assistant" ? "from AI assistant" : m.author === "staff" ? "from team" : "(automatic)"}`, body: m.body })),
               ...callLog.map((k) => ({ at: k.createdAt, key: k.id, text: `Call: ${k.status === "answered" ? "answered" : k.status === "voicemail" ? "voicemail left" : "missed"}`, body: k.recordingUrl ? "Voicemail recorded (play it under Inbox → Calls)" : "" })),
             ]
               .sort((x, y) => y.at.getTime() - x.at.getTime())

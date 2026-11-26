@@ -32,6 +32,7 @@ const anthropic = () => (client ??= new Anthropic({ maxRetries: 2, timeout: 45_0
 const CHANNEL_STYLE = {
   web: "",
   sms: "\nThis is a text conversation: keep every reply under 300 characters, don't use emoji or links, and never ask for their phone number (you already have it).",
+  whatsapp: "\nThis is a WhatsApp conversation: keep replies short and friendly (under 400 characters), no links, and never ask for their phone number (you already have it).",
   email:
     "\nThis is an email conversation. Write only the body of a short reply email: a greeting using their first name if you know it, 2 to 5 short sentences, and no sign-off or signature (one is added automatically). Plain text, no markdown. You already have their email address; ask for a phone number before booking.",
 } as const;
@@ -49,7 +50,7 @@ function hoursText(b: Business) {
 }
 
 /** Stable part of the system prompt: business facts + rules. Cached across requests. */
-function systemPrompt(b: Business, channel: "web" | "sms" | "email" = "web") {
+function systemPrompt(b: Business, channel: "web" | "sms" | "email" | "whatsapp" = "web") {
   const { business: biz, content: c } = publicSite(b);
   const s = bookingSettings(b);
   const facts = [
@@ -68,8 +69,8 @@ function systemPrompt(b: Business, channel: "web" | "sms" | "email" = "web") {
     `About: ${c.about}`,
   ].filter(Boolean).join("\n");
 
-  const where = channel === "sms" ? "by text message (SMS) on the company phone number" : channel === "email" ? "by email" : "on the company website";
-  return `You are the ${channel === "sms" ? "text-message" : channel === "email" ? "email" : "website"} assistant for ${biz.name}, a ${biz.trade.toLowerCase()} company. You chat with homeowners and property managers ${where}: you answer their questions and help them book a free site visit${s.offerCalls ? " or a phone call" : ""} with the team.
+  const where = channel === "sms" ? "by text message (SMS) on the company phone number" : channel === "whatsapp" ? "on WhatsApp" : channel === "email" ? "by email" : "on the company website";
+  return `You are the ${channel === "sms" ? "text-message" : channel === "whatsapp" ? "WhatsApp" : channel === "email" ? "email" : "website"} assistant for ${biz.name}, a ${biz.trade.toLowerCase()} company. You chat with homeowners and property managers ${where}: you answer their questions and help them book a free site visit${s.offerCalls ? " or a phone call" : ""} with the team.
 
 <company_facts>
 ${facts}
@@ -260,7 +261,7 @@ async function runTool(b: Business, state: TurnState, name: string, input: Recor
   return { content: `Unknown tool ${name}`, isError: true };
 }
 
-const channelLabel = (c: ChatConversation) => (c.channel === "sms" ? "a text conversation" : c.channel === "email" ? "an email conversation" : "a website chat");
+const channelLabel = (c: ChatConversation) => (c.channel === "sms" ? "a text conversation" : c.channel === "whatsapp" ? "a WhatsApp conversation" : c.channel === "email" ? "an email conversation" : "a website chat");
 
 /** Create the lead for this chat once; later calls reuse it. */
 async function ensureLead(
@@ -316,7 +317,7 @@ export async function chatTurn(b: Business, conv: ChatConversation, userText: st
           { type: "text", text: systemPrompt(b, channel) },
           {
             type: "text",
-            text: `Today is ${today} in the company's time zone (${tz}).${channel === "sms" && conv.address ? ` The customer is texting from ${conv.address}; use that number when booking.` : ""}${channel === "email" && conv.address ? ` The customer is emailing from ${conv.address}; use that email when booking.` : ""}`,
+            text: `Today is ${today} in the company's time zone (${tz}).${(channel === "sms" || channel === "whatsapp") && conv.address ? ` The customer is ${channel === "whatsapp" ? "on WhatsApp" : "texting"} from ${conv.address}; use that number when booking.` : ""}${channel === "email" && conv.address ? ` The customer is emailing from ${conv.address}; use that email when booking.` : ""}`,
           },
         ],
         tools: TOOLS,
