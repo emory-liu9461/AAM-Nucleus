@@ -55,8 +55,14 @@ export function QuoteForm({
           <option>Something else</option>
         </select>
       </label>
+      <label className="field sm:col-span-2">When would you like the work to start?
+        <select className="input" name="timeline" defaultValue="">
+          <option value="">Choose one</option>
+          {["As soon as possible (urgent)", "Within a month", "1–3 months", "3+ months", "Just getting prices"].map((t) => <option key={t}>{t}</option>)}
+        </select>
+      </label>
       <label className="field sm:col-span-2">Project details{compact ? " (optional)" : ""}
-        <textarea className="input" name="message" rows={compact ? 2 : 4} placeholder="What do you need done, and when?" />
+        <textarea className="input" name="message" rows={compact ? 2 : 4} placeholder="What do you need done?" />
       </label>
       <label className="flex items-start gap-2 text-sm font-normal text-muted sm:col-span-2">
         <input type="checkbox" name="marketing_consent" value="yes" className="mt-1" />

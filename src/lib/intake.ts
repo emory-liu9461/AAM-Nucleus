@@ -53,7 +53,8 @@ export function normalize(raw: Record<string, unknown>) {
     budget: get("budget", "estimated_value", "value"),
     honeypot: get("company_website", "_gotcha", "hp"),
     intake: {
-      timeline: get("timeline", "when", "start_date").slice(0, 100) || undefined,
+      timeline: get("timeline", "when").slice(0, 100) || undefined,
+      startDate: /^\d{4}-\d{2}-\d{2}$/.test(get("start_date", "ideal_start_date")) ? get("start_date", "ideal_start_date") : undefined,
       budgetRange: get("budget_range", "budgetrange").slice(0, 100) || undefined,
       propertyType: get("property_type", "propertytype").slice(0, 100) || undefined,
       homeowner: get("homeowner", "owner", "own_home").slice(0, 50) || undefined,

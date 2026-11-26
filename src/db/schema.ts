@@ -400,6 +400,7 @@ export type SiteSectionText = { show?: boolean; eyebrow?: string; title?: string
 export type Intake = {
   marketingConsent?: string; // "yes" = ticked "send me offers and tips"
   timeline?: string;
+  startDate?: string; // ideal start date (YYYY-MM-DD), if they picked one
   budgetRange?: string;
   propertyType?: string;
   homeowner?: string;

@@ -4,6 +4,8 @@ import { useActionState, useEffect, useRef } from "react";
 import { submitQuote } from "../actions";
 import { keepValuesOnSubmit } from "@/components/useKeepValues";
 
+const TIMELINES = ["As soon as possible (urgent)", "Within a month", "1–3 months", "3+ months", "Just getting prices"];
+
 export function QuoteForm({
   formKey, channel, heading, thankYou, services, hidden, embedded,
 }: {
@@ -57,7 +59,14 @@ export function QuoteForm({
             <input className="input" name="service" placeholder="e.g. Roof replacement" />
           )}
         </label>
-        <label className="field sm:col-span-2">Details<textarea className="input min-h-24" name="message" placeholder="Tell us about the project, timing, budget…" /></label>
+        <label className="field">When would you like the work to start?
+          <select className="input" name="timeline" defaultValue="">
+            <option value="">Choose one</option>
+            {TIMELINES.map((t) => <option key={t}>{t}</option>)}
+          </select>
+        </label>
+        <label className="field">Ideal start date (optional)<input className="input" type="date" name="start_date" min={new Date(Date.now() + 864e5).toISOString().slice(0, 10)} /></label>
+        <label className="field sm:col-span-2">Details<textarea className="input min-h-24" name="message" placeholder="Tell us about the project, budget…" /></label>
         <label className="flex items-start gap-2 text-sm text-muted sm:col-span-2">
           <input type="checkbox" name="marketing_consent" value="yes" className="mt-1" />
           <span>Also send me occasional offers and tips. Unsubscribe anytime.</span>

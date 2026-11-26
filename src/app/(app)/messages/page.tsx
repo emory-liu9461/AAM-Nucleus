@@ -5,7 +5,7 @@ import { markReplied } from "@/app/messages-actions";
 import { sendInboxReply } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { Transcript } from "@/components/Transcript";
-import { fmtDateTime, label } from "@/lib/format";
+import { fmtDate, fmtDateTime, label } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 import { messageFeed, type MessageItem } from "@/lib/messages";
 import { transcript } from "@/lib/assistant";
@@ -159,7 +159,7 @@ async function Detail({ i }: { i: MessageItem }) {
     const [c] = lead ? await db.select().from(schema.contacts).where(eq(schema.contacts.id, lead.contactId)) : [];
     const it = lead?.intake ?? {};
     const answers: [string, string | undefined][] = [
-      ["When", it.timeline], ["Budget", it.budgetRange], ["Property", it.propertyType], ["Owns it", it.homeowner],
+      ["When to start", it.timeline], ["Ideal start date", it.startDate ? fmtDate(it.startDate) : undefined], ["Budget", it.budgetRange], ["Property", it.propertyType], ["Owns it", it.homeowner],
       ["Preferred visit day", it.preferredDate], ["Best way to reach", it.contactMethod], ["Best time", it.bestTime],
       ["Heard about you", it.heardAbout], ["Address", [c?.address, c?.city, it.zip ?? c?.zip].filter(Boolean).join(", ") || undefined],
       ["Offers and tips", it.marketingConsent === "yes" ? "Yes, OK to send" : undefined],

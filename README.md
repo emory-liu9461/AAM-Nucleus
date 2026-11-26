@@ -23,6 +23,8 @@ A web app for running several construction businesses from one place: a combined
 
 Each business has a public **form key**. You have three ways to connect a website:
 
+Every form asks **when they'd like the work to start** (As soon as possible / Within a month / 1–3 months / 3+ months / Just getting prices) plus an optional **ideal start date**; both show on the lead and in Messages, and "As soon as possible" is flagged Urgent.
+
 1. **Embed:** `<script src="https://APP/embed.js" data-key="KEY" async></script>` adds a branded, self-resizing quote form (an iframe). It remembers the visitor's landing-page ad/UTM tags for the rest of their visit.
 2. **Hosted link:** `https://APP/f/KEY`, for Google Business Profile, social bios, texts and emails. Add `?utm_source=...` to track each one.
 3. **API:** `POST https://APP/api/public/leads/KEY`, JSON or a normal form post. Field names are flexible (`name`/`first_name`, `email`, `phone`, `service`, `message`, `budget`, `utm_*`). Include `_redirect` to send HTML-form visitors back to your own thank-you page.

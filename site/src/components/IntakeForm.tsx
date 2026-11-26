@@ -99,7 +99,8 @@ export function IntakeForm({ endpoint, services, defaultService, businessName = 
           <textarea className="input" name="message" rows={4} required minLength={5}
             placeholder="What's going on, what you'd like done, sizes or rooms involved, anything we should know…" />
         </label>
-        <Choice name="timeline" label="When would you like to start?" options={TIMELINES} required />
+        <Choice name="timeline" label="When would you like the work to start?" options={TIMELINES} required />
+        <label className="field">Ideal start date <span className="text-xs font-normal text-muted">(optional)</span><input className="input" type="date" name="start_date" min={minDate} /></label>
         <Choice name="budget_range" label="Rough budget" options={BUDGETS} hint="Helps us suggest the right options" />
       </fieldset>
 

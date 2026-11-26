@@ -16,6 +16,7 @@ const { leads, contacts, users, jobs } = schema;
 
 const INTAKE_LABELS: [keyof NonNullable<typeof leads.$inferSelect.intake>, string][] = [
   ["timeline", "When to start"],
+  ["startDate", "Ideal start date"],
   ["budgetRange", "Budget"],
   ["propertyType", "Property type"],
   ["homeowner", "Owns the property"],
@@ -131,7 +132,7 @@ export default async function LeadDetail({ params }: { params: Promise<{ slug: s
               {intake.map(([k, l]) => (
                 <div key={k} className="contents">
                   <dt className="text-muted">{l}</dt>
-                  <dd className="font-medium">{k === "preferredDate" ? fmtDate(lead.intake![k]!) : lead.intake![k]}</dd>
+                  <dd className="font-medium">{(k === "preferredDate" || k === "startDate") ? fmtDate(lead.intake![k]!) : lead.intake![k]}</dd>
                 </div>
               ))}
             </dl>
