@@ -45,3 +45,63 @@ body {
   .input { @apply w-full rounded-lg border border-line bg-white px-3 py-2.5 text-base text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20; }
   .prose-site p { @apply mb-4 leading-relaxed text-muted; }
 }
+
+/* ---------- Themes (chosen per business in Nucleus: Social → Website content → Theme) ---------- */
+
+@font-face { font-family: "Barlow Condensed"; src: url("/fonts/barlow-condensed-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; src: url("/fonts/barlow-condensed-600.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "DM Serif Display"; src: url("/fonts/dm-serif-display-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Jost"; src: url("/fonts/jost-var.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Montserrat"; src: url("/fonts/montserrat-var.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Outfit"; src: url("/fonts/outfit-var.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+
+.site-theme { --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; --font-head: var(--font-body); font-family: var(--font-body); }
+.site-theme :is(h1, h2, h3, .h2) { font-family: var(--font-head); }
+
+/* Bold: dark, condensed capitals, square corners (roofing, concrete, construction). */
+.theme-bold {
+  --font-head: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --surface: #f3f4f6;
+  --radius-sm: 0; --radius-md: 2px; --radius-lg: 2px; --radius-xl: 3px; --radius-2xl: 4px; --radius-3xl: 4px;
+}
+.theme-bold :is(h1, h2, .h2) { text-transform: uppercase; letter-spacing: 0.01em; font-weight: 700; line-height: 1.02; }
+.theme-bold h1 { font-size: clamp(2.75rem, 7vw, 5rem); }
+.theme-bold .eyebrow { letter-spacing: 0.18em; }
+.theme-bold .btn-primary, .theme-bold .btn-outline { text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* Fresh: friendly and soft, pill buttons, very rounded (cleaning, landscaping). */
+.theme-fresh {
+  --font-body: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-head: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --surface: color-mix(in oklab, var(--brand) 6%, white);
+  --line: color-mix(in oklab, var(--brand) 14%, #e5e7eb);
+  --radius-lg: 0.9rem; --radius-xl: 1.5rem; --radius-2xl: 2rem; --radius-3xl: 2.5rem;
+}
+.theme-fresh :is(h1, h2, .h2) { font-weight: 700; letter-spacing: -0.01em; }
+.theme-fresh .btn-primary, .theme-fresh .btn-outline { border-radius: 9999px; }
+.theme-fresh .input { border-radius: 0.9rem; }
+
+/* Elegant: serif headings, warm cream, fine lines (painting, renovations). */
+.theme-elegant {
+  --font-body: "Jost", ui-sans-serif, system-ui, sans-serif;
+  --font-head: "DM Serif Display", Georgia, "Times New Roman", serif;
+  --surface: #f7f3ec;
+  --line: #e7dfd2;
+  --ink: #1f1b16;
+  --muted: #5f574c;
+  --radius-lg: 2px; --radius-xl: 4px; --radius-2xl: 6px; --radius-3xl: 8px;
+}
+.theme-elegant :is(h1, h2, .h2, h3) { font-weight: 400; letter-spacing: 0; }
+.theme-elegant h1 { line-height: 1.05; }
+.theme-elegant .eyebrow { font-weight: 500; letter-spacing: 0.22em; }
+.theme-elegant .btn-primary, .theme-elegant .btn-outline { font-weight: 500; letter-spacing: 0.04em; }
+
+/* Modern: geometric type, gradient hero, floating cards (renovations, general contracting). */
+.theme-modern {
+  --font-body: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  --font-head: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  --surface: #f5f7fb;
+  --radius-lg: 0.6rem; --radius-xl: 1rem; --radius-2xl: 1.25rem; --radius-3xl: 1.75rem;
+}
+.theme-modern :is(h1, h2, .h2) { font-weight: 800; letter-spacing: -0.02em; }
+.theme-modern main .rounded-xl.border { box-shadow: 0 10px 30px -18px rgb(15 23 42 / 0.25); border-color: transparent; }

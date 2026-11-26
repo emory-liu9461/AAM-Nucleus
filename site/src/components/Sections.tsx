@@ -59,27 +59,47 @@ export function Priorities({ site }: { site: Site }) {
   );
 }
 
+/* The top section differs most between themes (see globals.css for fonts and corners). */
+const HERO: Record<string, { section: string; bg?: React.CSSProperties; dark: boolean; grid: boolean }> = {
+  classic: { section: "bg-brand-soft", dark: false, grid: true },
+  bold: { section: "bg-[#0f1115] border-t-4 border-brand", dark: true, grid: false },
+  fresh: { section: "bg-brand-soft", dark: false, grid: false },
+  elegant: { section: "bg-surface", dark: false, grid: false },
+  modern: { section: "", bg: { background: "linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 55%, #0b1220 100%)" }, dark: true, grid: false },
+};
+
 export function Hero({ site }: { site: Site }) {
   const { business: b, content: c } = site;
+  const theme = c.theme ?? "classic";
+  const h = HERO[theme] ?? HERO.classic;
+  const onBrand = theme === "modern"; // the background is the brand colour, so buttons go white
   return (
-    <section className="relative overflow-hidden bg-brand-soft">
-      <div aria-hidden className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: "linear-gradient(var(--brand) 1px, transparent 1px), linear-gradient(90deg, var(--brand) 1px, transparent 1px)", backgroundSize: "44px 44px" }} />
+    <section className={`relative overflow-hidden ${h.section} ${h.dark ? "text-white" : ""}`} style={h.bg}>
+      {h.grid && <div aria-hidden className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: "linear-gradient(var(--brand) 1px, transparent 1px), linear-gradient(90deg, var(--brand) 1px, transparent 1px)", backgroundSize: "44px 44px" }} />}
+      {theme === "fresh" && (
+        <>
+          <div aria-hidden className="absolute -right-24 -top-24 h-80 w-80 rounded-full opacity-40" style={{ background: "color-mix(in oklab, var(--brand) 22%, white)" }} />
+          <div aria-hidden className="absolute -bottom-32 -left-20 h-72 w-72 rounded-full opacity-30" style={{ background: "color-mix(in oklab, var(--brand) 30%, white)" }} />
+        </>
+      )}
+      {theme === "bold" && <div aria-hidden className="absolute inset-y-0 right-0 hidden w-1/3 opacity-[0.06] lg:block" style={{ backgroundImage: "repeating-linear-gradient(-45deg, #fff 0 2px, transparent 2px 18px)" }} />}
       <div className="wrap relative grid items-center gap-10 py-14 lg:grid-cols-[1.1fr_1fr] lg:py-20">
         <div>
-          {c.primaryCity && <p className="eyebrow flex items-center gap-1.5"><Icon name="pin" className="h-4 w-4" />{c.primaryCity}</p>}
-          <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-ink sm:text-5xl lg:text-6xl">{c.heroHeadline}</h1>
-          <p className="lead mt-5 max-w-xl">{c.heroSubheadline}</p>
+          {c.primaryCity && <p className={`eyebrow flex items-center gap-1.5 ${onBrand ? "text-white/80" : ""}`} style={h.dark && !onBrand ? { color: "color-mix(in oklab, var(--brand) 55%, white)" } : undefined}><Icon name="pin" className="h-4 w-4" />{c.primaryCity}</p>}
+          {theme === "elegant" && <div aria-hidden className="mt-4 h-px w-16 bg-brand" />}
+          <h1 className={`mt-3 text-4xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl ${h.dark ? "text-white" : "text-ink"}`}>{c.heroHeadline}</h1>
+          <p className={`lead mt-5 max-w-xl ${h.dark ? "!text-white/80" : ""}`}>{c.heroSubheadline}</p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <Link href="/quote" className="btn-primary text-base">Get a free quote <Icon name="arrow" className="h-4 w-4" /></Link>
-            {b.phone && <a href={telHref(b.phone)} className="btn-outline text-base"><Icon name="phone" className="h-4 w-4" />{b.phone}</a>}
+            <Link href="/quote" className={`btn-primary text-base ${onBrand ? "!bg-white !text-brand-dark hover:!bg-white/90" : ""}`}>Get a free quote <Icon name="arrow" className="h-4 w-4" /></Link>
+            {b.phone && <a href={telHref(b.phone)} className={`btn-outline text-base ${h.dark ? "!border-white/30 !bg-transparent !text-white hover:!border-white" : ""}`}><Icon name="phone" className="h-4 w-4" />{b.phone}</a>}
           </div>
-          {section(site, "trust", { eyebrow: "", title: "", intro: "" }).show && <ul className="mt-8 grid max-w-lg grid-cols-2 gap-3 text-sm font-medium">
+          {section(site, "trust", { eyebrow: "", title: "", intro: "" }).show && <ul className={`mt-8 grid max-w-lg grid-cols-2 gap-3 text-sm font-medium ${h.dark ? "text-white/90" : ""}`}>
             {trustPoints(site).map((t) => (
-              <li key={t.label} className="flex items-center gap-2"><Icon name={t.icon} className="h-5 w-5 text-brand" />{t.label}</li>
+              <li key={t.label} className="flex items-center gap-2"><Icon name={t.icon} className={`h-5 w-5 ${onBrand ? "text-white" : "text-brand"}`} />{t.label}</li>
             ))}
           </ul>}
         </div>
-        <div className="rounded-2xl border border-line bg-white p-6 shadow-xl shadow-slate-900/5" id="quote">
+        <div className={`rounded-2xl border border-line bg-white p-6 text-ink shadow-xl ${h.dark ? "shadow-black/30" : "shadow-slate-900/5"}`} id="quote">
           <QuoteForm businessName={site.business.name} endpoint={endpointFor(site)} services={c.services.map((s) => s.name)} compact heading="Request your free quote" />
         </div>
       </div>

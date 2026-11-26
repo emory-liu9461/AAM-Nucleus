@@ -378,6 +378,7 @@ export type SiteContent = {
   services?: { name: string; summary?: string }[];
   reviews?: { name: string; city?: string; text: string; rating?: number }[];
   financing?: string;
+  theme?: SiteTheme; // website look; empty = automatic by trade
   guaranteeDays?: number; // satisfaction guarantee ("tell us within N days and we'll make it right"); 0 = none
   // Editable page sections (empty = the defaults in src/lib/site-defaults.ts).
   trustPoints?: { label: string; detail?: string }[];
@@ -388,6 +389,7 @@ export type SiteContent = {
   analytics?: { ga4?: string; googleAds?: string; metaPixel?: string };
 };
 
+export type SiteTheme = "classic" | "bold" | "fresh" | "elegant" | "modern";
 export type SiteSectionKey = "trust" | "services" | "projects" | "process" | "reviews" | "about" | "priorities" | "cta";
 export type SiteSectionText = { show?: boolean; eyebrow?: string; title?: string; intro?: string };
 

@@ -7,7 +7,7 @@ import { z } from "zod";
 import { db, schema } from "@/db";
 import { dollarsToCents, slugify } from "@/lib/format";
 import { can, requireBusiness, requirePermission } from "@/lib/session";
-import { BRAND_LOGOS, guaranteeDays, guaranteeLabel, guaranteeWithin, normalizeDomain, pageSections, presetWarranty, toLines } from "@/lib/site-defaults";
+import { BRAND_LOGOS, SITE_THEMES, guaranteeDays, guaranteeLabel, guaranteeWithin, normalizeDomain, pageSections, presetWarranty, toLines } from "@/lib/site-defaults";
 import type { AlertSettings, AssistantSettings, EmailSettings, PhoneSettings, ReviewSettings, SiteContent, SiteSectionKey, SiteSectionText } from "@/db/schema";
 import { alertSettings, notify } from "@/lib/alerts";
 import { reviewSettings, sendReviewRequest } from "@/lib/reviews";
@@ -329,6 +329,7 @@ export async function updateSiteContent(slug: string, _: { error?: string; ok?: 
       return { name, city: city || undefined, text: text ?? "", rating: Number(rating) || 5 };
     }).filter((r) => r.name && r.text),
     financing: str(form, "financing") ?? undefined,
+    theme: SITE_THEMES.some((t) => t.key === str(form, "theme")) ? (str(form, "theme") as SiteContent["theme"]) : undefined,
     guaranteeDays: (() => {
       const n = Number(str(form, "guaranteeDays") ?? "14");
       return Number.isFinite(n) && n >= 0 && n <= 365 && Math.round(n) !== 14 ? Math.round(n) : undefined;

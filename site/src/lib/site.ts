@@ -47,6 +47,7 @@ export type Site = {
     services: { name: string; slug: string; summary: string }[];
     reviews: { name: string; city?: string; text: string; rating: number }[];
     financing: string | null;
+    theme?: "classic" | "bold" | "fresh" | "elegant" | "modern";
     // Editable in Nucleus (Social → Website content → Page sections). Optional so an older Nucleus still works.
     trustPoints?: { label: string; detail: string }[];
     priorities?: { title: string; text: string }[];

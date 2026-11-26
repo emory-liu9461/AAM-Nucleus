@@ -1,4 +1,4 @@
-import type { Business, SiteContent, SiteSectionKey, SiteSectionText } from "@/db/schema";
+import type { Business, SiteContent, SiteSectionKey, SiteSectionText, SiteTheme } from "@/db/schema";
 import { slugify } from "./format";
 
 /*
@@ -111,6 +111,24 @@ function presetFor(trade: string): Preset {
 }
 
 export type PublicSite = ReturnType<typeof publicSite>;
+
+/** Website looks. Each business can pick one; by default the trade decides, so sister businesses look different. */
+export const SITE_THEMES: { key: SiteTheme; name: string; text: string }[] = [
+  { key: "classic", name: "Classic", text: "Clean and light, with a subtle grid. Works for any trade." },
+  { key: "bold", name: "Bold", text: "Dark header and top section, tall condensed capitals, square corners. Strong and no-nonsense." },
+  { key: "fresh", name: "Fresh", text: "Friendly rounded font, pill buttons and soft tints. Bright and approachable." },
+  { key: "elegant", name: "Elegant", text: "Serif headings on warm cream with fine lines. Refined, for higher-end work." },
+  { key: "modern", name: "Modern", text: "Geometric font, a colour gradient up top and floating cards. Sleek and current." },
+];
+
+export function themeForTrade(trade: string): SiteTheme {
+  const t = trade.toLowerCase();
+  if (/roof|concrete|paving|masonry|excavat|demolit/.test(t)) return "bold";
+  if (/clean|janitor|maid|landscap|lawn|garden/.test(t)) return "fresh";
+  if (/paint|stain|coating|interior|design/.test(t)) return "elegant";
+  if (/remodel|renovat|kitchen|bath|construct|contract|build/.test(t)) return "modern";
+  return "classic";
+}
 
 export const presetWarranty = (trade: string) => presetFor(trade).warranty;
 
@@ -237,6 +255,7 @@ export function publicSite(b: Business) {
       services: services.map((s) => ({ name: s.name, slug: slugify(s.name), summary: s.summary || presetSummary(s.name) || "" })),
       reviews: (c.reviews ?? []).filter((r) => r.name && r.text).map((r) => ({ ...r, rating: Math.min(5, Math.max(1, r.rating ?? 5)) })),
       financing: c.financing || null,
+      theme: c.theme && SITE_THEMES.some((t) => t.key === c.theme) ? c.theme : themeForTrade(b.trade),
       ...pageSections(b, c, c.warranty || p.warranty),
       social: c.social ?? {},
       analytics: c.analytics ?? {},

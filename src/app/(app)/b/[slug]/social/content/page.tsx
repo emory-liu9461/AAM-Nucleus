@@ -2,7 +2,7 @@ import Link from "next/link";
 import { updateSiteContent } from "@/app/actions";
 import { ActionForm } from "@/components/ActionForm";
 import { requireBusinessPage } from "@/lib/session";
-import { BRAND_LOGOS, SECTION_LABELS, logoFor, publicSite, toLines } from "@/lib/site-defaults";
+import { BRAND_LOGOS, SECTION_LABELS, SITE_THEMES, logoFor, publicSite, themeForTrade, toLines } from "@/lib/site-defaults";
 import type { SiteSectionKey } from "@/db/schema";
 import { websiteBaseUrl } from "@/lib/app-settings";
 
@@ -67,6 +67,22 @@ export default async function SiteContentPage({ params }: { params: Promise<{ sl
             ) : (
               <span className="text-sm text-muted">{b.name} (text)</span>
             )}
+          </div>
+        </Card>
+
+        <Card title="Theme">
+          <p className="text-sm text-muted sm:col-span-2">The overall look: fonts, corners, and the style of the header and top section. Your logo and brand colour are used in every theme.</p>
+          <div className="grid gap-2 sm:col-span-2 sm:grid-cols-2">
+            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-line p-3 text-sm has-[:checked]:border-accent has-[:checked]:bg-accent/5">
+              <input type="radio" name="theme" value="" defaultChecked={!c.theme} className="mt-1" />
+              <span><span className="font-semibold">Automatic</span><span className="block text-muted">Based on the trade: {SITE_THEMES.find((t) => t.key === themeForTrade(b.trade))?.name} for {b.trade.toLowerCase()}.</span></span>
+            </label>
+            {SITE_THEMES.map((t) => (
+              <label key={t.key} className="flex cursor-pointer items-start gap-2 rounded-lg border border-line p-3 text-sm has-[:checked]:border-accent has-[:checked]:bg-accent/5">
+                <input type="radio" name="theme" value={t.key} defaultChecked={c.theme === t.key} className="mt-1" />
+                <span><span className="font-semibold">{t.name}</span><span className="block text-muted">{t.text}</span></span>
+              </label>
+            ))}
           </div>
         </Card>
 

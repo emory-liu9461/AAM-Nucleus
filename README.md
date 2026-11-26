@@ -100,6 +100,10 @@ Every invoice has a private payment page (`/pay/<token>`): the invoice with tax,
 - Stripe webhook: `/api/stripe/webhook/<business id>` (shown in Settings) for `checkout.session.completed` and `checkout.session.async_payment_succeeded`. Payments are recorded when the customer comes back from Stripe and by the webhook, once each (`payments.reference = stripe:<session>`), and the invoice becomes Paid or Partial. An alert (Settings → Alerts, "Invoice paid online") goes to the team.
 - Charged in `CURRENCY` (CAD by default). For local testing, `STRIPE_API_BASE` points at a stand-in.
 
+## Website themes
+
+Social → Edit website content → **Theme**: Classic, Bold (dark header and top section, condensed capitals, square corners), Fresh (rounded font, pill buttons, soft tints), Elegant (serif headings, warm cream) or Modern (geometric font, gradient top section). **Automatic** picks by trade (roofing/concrete → Bold, cleaning/landscaping → Fresh, painting → Elegant, renovations/construction → Modern), so sister businesses don't look alike. Fonts are self-hosted in `site/public/fonts` (SIL Open Font License, subset to Latin).
+
 ## Website page sections
 
 Social → Edit website content → **Satisfaction guarantee (days)** (default 14, 0 = none) sets the guarantee wording on the website, the job-completed message and the project page.
